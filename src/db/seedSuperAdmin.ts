@@ -5,15 +5,15 @@ import { prisma } from "../helpers/prisma.js";
 import { Role } from "../types/enum.js";
 
 export const seedSuperAdmin = async () => {
- console.log("Checking for Admin with email:", config.admin.email);
+  console.log("Checking for Admin with email:", config.admin.email);
 
- // Now prisma.user.findFirst cannot be undefined
- const isExist = await prisma.user.findFirst({
-   where: {
-     email: config.admin.email,
-     role: Role.ADMIN,
-   },
- });
+  // Now prisma.user.findFirst cannot be undefined
+  const isExist = await prisma.user.findFirst({
+    where: {
+      email: config.admin.email,
+      role: Role.ADMIN,
+    },
+  });
 
   if (!isExist) {
     const hashedPassword = await bcrypt.hash(
@@ -27,7 +27,7 @@ export const seedSuperAdmin = async () => {
         email: config.admin.email as string,
         phone: config.admin.phone as string,
         password: hashedPassword,
-        avatar: config.admin.avatar as string,
+        profileImage: config.admin.avatar as string,
         role: Role.ADMIN,
         isVerified: true,
       },

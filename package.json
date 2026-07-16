@@ -24,7 +24,6 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.0.0",
     "@types/nodemailer": "^7.0.10",
-    "@types/redis": "^4.0.11",
     "@types/socket.io": "^3.0.2",
     "bcryptjs": "^3.0.3",
     "colors": "^1.4.0",
@@ -40,7 +39,6 @@
     "pdfkit": "^0.18.0",
     "pg": "^8.16.3",
     "postgis": "^1.0.6",
-    "redis": "^5.11.0",
     "slugify": "^1.6.6",
     "socket.io": "^4.8.3",
     "zod": "^4.3.6"

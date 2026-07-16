@@ -1,7 +1,6 @@
 import app from "./app.js";
 import config from "./config/index.js";
 import { seedSuperAdmin } from "./db/seedSuperAdmin.js";
-import { initSocket } from "./helpers/socketHelper.js";
 
 let server: any;
 
@@ -19,9 +18,6 @@ async function bootstrap() {
     server = app.listen(config.port, () => {
       console.log(`🚀 Server running on http://localhost:${config.port}`);
     });
-    // socket
-    //socket
-    initSocket(server);
   } catch (error) {
     console.error("Error during server startup:", error);
     process.exit(1);

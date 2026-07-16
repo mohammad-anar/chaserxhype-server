@@ -1,16 +1,66 @@
 enum UserRole {
-    PATIENT
-    DOCTOR
+    USER
     ADMIN
 }
 
 enum UserStatus {
+    PENDING
     ACTIVE
     INACTIVE
-    DELETED
+    SUSPENDED
+    BLOCKED
 }
 
 enum Gender {
     MALE
     FEMALE
+}
+
+enum SavedCardStatus {
+    ACTIVE
+    INACTIVE
+}
+
+enum SupportTicketStatus {
+    PENDING
+    RESOLVED
+}
+
+enum AdjustmentType {
+    ADD
+    SUBTRACT
+}
+
+enum OrderStatus {
+    PENDING
+    CONFIRMED
+    PREPARING
+    READY
+    OUT_FOR_DELIVERY
+    COMPLETED
+    CANCELED
+    REFUNDED
+    FAILED
+}
+
+enum PaymentStatus {
+    PENDING
+    PROCESSING
+    PAID
+    FAILED
+    CANCELLED
+    REFUNDED
+}
+
+enum PaymentMethod {
+    MONEY
+    REWARD_COINS
+}
+
+enum PayType {
+    CARD
+    STRIPE
+    PAYPAL
+    APPLE_PAY
+    GOOGLE_PAY
 }

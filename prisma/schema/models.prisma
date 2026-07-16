@@ -1,0 +1,377 @@
+model User {
+    id                 String          @id @default(cuid())
+    name               String
+    email              String          @unique
+    phone              String?         @unique
+    password           String
+    role               UserRole        @default(USER)
+    status             UserStatus      @default(ACTIVE)
+    profileImage       String?
+    isVerified         Boolean         @default(false)
+    isDeleted          Boolean         @default(false)
+    otpCode            String?
+    otpExpiresAt       DateTime?
+    needPasswordChange Boolean         @default(true)
+    createdAt          DateTime        @default(now())
+    updatedAt          DateTime        @updatedAt
+    addresses          Address[]
+    wallets            Wallet[]
+    savedCards         SavedCard[]
+    supportTickets     SupportTicket[]
+    carts              Cart[]
+    orders             Order[]
+    payments           Payment[]
+
+    @@map("users")
+}
+
+model Address {
+    id String @id @default(cuid())
+
+    userId String
+    user   User   @relation(fields: [userId], references: [id])
+
+    street1 String
+    street2 String?
+    state   String
+    city    String
+    country String
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+model Wallet {
+    id String @id @default(cuid())
+
+    userId String
+    user   User   @relation(fields: [userId], references: [id])
+
+    balance Decimal
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+
+model SavedCard {
+    id String @id @default(cuid())
+
+    userId String
+    user   User   @relation(fields: [userId], references: [id])
+
+    cardNumber String
+    cvc        String
+    expireDate String
+    status     SavedCardStatus @default(ACTIVE)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+
+model SupportTicket {
+    id String @id @default(cuid())
+
+    userId String
+    user   User   @relation(fields: [userId], references: [id])
+
+    subject String
+    message String
+    status  SupportTicketStatus @default(PENDING)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+model Category {
+    id        String  @id @default(cuid())
+    name      String
+    isActive  Boolean @default(true)
+    isDeleted Boolean @default(false)
+
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
+    products  Product[]
+}
+
+model Product {
+    id String @id @default(cuid())
+
+    categoryId String
+    category   Category @relation(fields: [categoryId], references: [id])
+
+    slug             String
+    shortDescription String
+    description      String
+    basePrice        Decimal
+    image            String[]
+    coin             Int
+    customOption     Boolean  @default(false)
+    isDeleted        Boolean  @default(false)
+
+    createdAt     DateTime       @default(now())
+    updatedAt     DateTime       @updatedAt
+    productSizes  ProductSize[]
+    productMilks  ProductMilk[]
+    productExtras ProductExtra[]
+    cartItems     CartItem[]
+    orderItems    OrderItem[]
+}
+
+model Size {
+    id   String @id @default(cuid())
+    name String
+
+    createdAt    DateTime      @default(now())
+    updatedAt    DateTime      @updatedAt
+    productSizes ProductSize[]
+}
+
+model Milk {
+    id   String @id @default(cuid())
+    name String
+
+    createdAt    DateTime      @default(now())
+    updatedAt    DateTime      @updatedAt
+    productMilks ProductMilk[]
+}
+
+model Extra {
+    id   String @id @default(cuid())
+    name String
+
+    createdAt     DateTime       @default(now())
+    updatedAt     DateTime       @updatedAt
+    productExtras ProductExtra[]
+}
+
+
+model ProductSize {
+    id String @id @default(cuid())
+
+    productId String
+    product   Product @relation(fields: [productId], references: [id])
+
+    sizeId String
+    size   Size   @relation(fields: [sizeId], references: [id])
+
+    name            String
+    oz              String
+    priceAdjustment Decimal
+    adjustmentType  AdjustmentType
+
+    createdAt  DateTime    @default(now())
+    updatedAt  DateTime    @updatedAt
+    cartItems  CartItem[]
+    orderItems OrderItem[]
+}
+
+model ProductMilk {
+    id String @id @default(cuid())
+
+    productId String
+    product   Product @relation(fields: [productId], references: [id])
+
+    milkId String
+    milk   Milk   @relation(fields: [milkId], references: [id])
+
+    name            String
+    priceAdjustment Decimal
+    adjustmentType  AdjustmentType
+
+    createdAt  DateTime    @default(now())
+    updatedAt  DateTime    @updatedAt
+    cartItems  CartItem[]
+    orderItems OrderItem[]
+}
+
+model ProductExtra {
+    id String @id @default(cuid())
+
+    productId String
+    product   Product @relation(fields: [productId], references: [id])
+
+    extraId String
+    extra   Extra  @relation(fields: [extraId], references: [id])
+
+    name  String
+    price Decimal
+
+    createdAt       DateTime         @default(now())
+    updatedAt       DateTime         @updatedAt
+    cartItemExtras  CartItemExtra[]
+    orderItemExtras OrderItemExtra[]
+}
+
+model CoinProduct {
+    id        String  @id @default(cuid())
+    name      String
+    needPoint Int
+    isDeleted Boolean @default(false)
+
+    createdAt  DateTime    @default(now())
+    updatedAt  DateTime    @updatedAt
+    cartItems  CartItem[]
+    orderItems OrderItem[]
+}
+
+model Cart {
+    id String @id @default(cuid())
+
+    userId String
+    user   User   @relation(fields: [userId], references: [id])
+
+    subTotal      Decimal?
+    discount      Decimal?
+    taxAmount     Decimal?
+    serviceCharge Decimal?
+    deliveryFee   Decimal?
+    total         Decimal?
+
+    totalCoin Int?
+
+    createdAt DateTime   @default(now())
+    updatedAt DateTime   @updatedAt
+    cartItems CartItem[]
+}
+
+model CartItem {
+    id     String @id @default(cuid())
+    cartId String
+    cart   Cart   @relation(fields: [cartId], references: [id])
+
+    productId String?
+    product   Product? @relation(fields: [productId], references: [id])
+
+    coinProductId String?
+    coinProduct   CoinProduct? @relation(fields: [coinProductId], references: [id])
+
+    isCoinProduct Boolean  @default(false)
+    quantity      Int
+    basePrice     Decimal?
+
+    selectedSizeId String?
+    selectedSize   ProductSize? @relation(fields: [selectedSizeId], references: [id])
+    selectedMildId String?
+    selectedMild   ProductMilk? @relation(fields: [selectedMildId], references: [id])
+
+    totalPrice Decimal?
+    totalCoin  Decimal?
+
+    createdAt      DateTime        @default(now())
+    updatedAt      DateTime        @updatedAt
+    cartItemExtras CartItemExtra[]
+}
+
+model CartItemExtra {
+    id String @id @default(cuid())
+
+    cartItemId String
+    cartItem   CartItem @relation(fields: [cartItemId], references: [id])
+
+    productExtraId String
+    productExtra   ProductExtra @relation(fields: [productExtraId], references: [id])
+
+    price Decimal
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+
+model Order {
+    id          String @id @default(cuid())
+    orderNumber String
+
+    userId String
+    user   User   @relation(fields: [userId], references: [id])
+
+    status        OrderStatus   @default(PENDING)
+    paymentStatus PaymentStatus @default(PENDING)
+
+    subTotal      Decimal?
+    discount      Decimal?
+    taxAmount     Decimal?
+    deliveryFee   Decimal?
+    serviceCharge Decimal?
+    paymentMethod PaymentMethod
+    payType       PayType?
+    earnedCoin    Int?
+    usedCoin      Int?
+    total         Decimal?
+    note          String?
+
+    createdAt  DateTime    @default(now())
+    updatedAt  DateTime    @updatedAt
+    orderItems OrderItem[]
+    payments   Payment[]
+}
+
+model OrderItem {
+    id String @id @default(cuid())
+
+    orderId String
+    order   Order  @relation(fields: [orderId], references: [id])
+
+    productId String?
+    product   Product? @relation(fields: [productId], references: [id])
+
+    coinProductId String?
+    coinProduct   CoinProduct? @relation(fields: [coinProductId], references: [id])
+
+    isCoinProduct Boolean  @default(false)
+    quantity      Int?
+    basePrice     Decimal?
+
+    selectedSizeId String?
+    selectedSize   ProductSize? @relation(fields: [selectedSizeId], references: [id])
+
+    selectedMilkId String?
+    selectedMilk   ProductMilk? @relation(fields: [selectedMilkId], references: [id])
+
+    totalPrice Decimal?
+    totalCoin  Int
+
+    createdAt       DateTime         @default(now())
+    updatedAt       DateTime         @updatedAt
+    orderItemExtras OrderItemExtra[]
+}
+
+model OrderItemExtra {
+    id String @id @default(cuid())
+
+    orderItemId String
+    orderItem   OrderItem @relation(fields: [orderItemId], references: [id])
+
+    productExtraId String
+    productExtra   ProductExtra @relation(fields: [productExtraId], references: [id])
+
+    price Decimal
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+model Payment {
+    id String @id @default(cuid())
+
+    orderId String
+    order   Order  @relation(fields: [orderId], references: [id])
+
+    userId String
+    user   User   @relation(fields: [userId], references: [id])
+
+    paymentMethod          PayType       @default(CARD)
+    status                 PaymentStatus @default(PENDING)
+    amount                 Decimal
+    currency               String
+    transactionId          String        @unique
+    gatewayPaymentId       String?
+    gateWayPaymentResponse String?
+    paidAt                 DateTime      @default(now())
+    failureReson           String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
