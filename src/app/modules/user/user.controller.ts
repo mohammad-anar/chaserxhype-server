@@ -6,6 +6,7 @@ import { StatusCodes } from "http-status-codes";
 import pick from "../../../helpers/pick.js";
 import { getSingleFilePath } from "../../shared/getFilePath.js";
 import ApiError from "../../../errors/ApiError.js";
+import { unlinkFiles } from "../../shared/unlinkFile.js";
 
 const createUser = catchAsync(async (req: Request, res: Response) => {
   const profileImage = getSingleFilePath(req.files, "image");
@@ -14,14 +15,20 @@ const createUser = catchAsync(async (req: Request, res: Response) => {
     ...(profileImage && { profileImage }),
   };
 
-  const result = await UserServices.createUser(payload);
+  try {
+    const result = await UserServices.createUser(payload);
 
-  sendResponse(res, {
-    statusCode: StatusCodes.CREATED,
-    success: true,
-    message: "User registered successfully. Verification OTP sent to email.",
-    data: result,
-  });
+    sendResponse(res, {
+      statusCode: StatusCodes.CREATED,
+      success: true,
+      message: "User registered successfully. Verification OTP sent to email.",
+      data: result,
+    });
+  } catch (error) {
+    // If creation fails, clean up the uploaded image
+    unlinkFiles(req.files);
+    throw error;
+  }
 });
 
 const getMyProfile = catchAsync(async (req: Request, res: Response) => {

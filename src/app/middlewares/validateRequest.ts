@@ -1,6 +1,8 @@
 import { NextFunction, Request, Response } from "express";
 import { ZodObject } from "zod";
 
+import { unlinkFiles } from "../shared/unlinkFile.js";
+
 const validateRequest =
   (schema: ZodObject<any>) =>
   async (req: Request, res: Response, next: NextFunction) => {
@@ -21,6 +23,8 @@ const validateRequest =
       req.body = parsedBody;
       next();
     } catch (error) {
+      // Clean up any uploaded files if validation fails
+      unlinkFiles(req.files);
       console.log(error);
       next(error);
     }
