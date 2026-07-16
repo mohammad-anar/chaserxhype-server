@@ -82,6 +82,10 @@ const changePassword = async (userId: string, payload: IChangePasswordPayload) =
     throw new ApiError(StatusCodes.BAD_REQUEST, "Old and new passwords are required");
   }
 
+  if (oldPassword === newPassword) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, "New password cannot be the same as your old password");
+  }
+
   const user = await prisma.user.findUnique({
     where: { id: userId },
   });
@@ -257,6 +261,11 @@ const resetPassword = async (payload: IResetPasswordPayload) => {
 
   if (!user || user.isDeleted) {
     throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
+  }
+
+  const isSamePassword = await bcrypt.compare(rawPassword, user.password);
+  if (isSamePassword) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, "New password cannot be the same as your current password");
   }
 
   const hashedPassword = await bcrypt.hash(

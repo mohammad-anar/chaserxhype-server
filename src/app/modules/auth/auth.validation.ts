@@ -12,17 +12,22 @@ const loginZodSchema = z.object({
     }),
 });
 
-const changePasswordZodSchema = z.object({
-  oldPassword: z
-    .string({
-      message: "Old password is required",
-    }),
-  newPassword: z
-    .string({
-      message: "New password is required",
-    })
-    .min(6, "New password must be at least 6 characters"),
-});
+const changePasswordZodSchema = z
+  .object({
+    oldPassword: z
+      .string({
+        message: "Old password is required",
+      }),
+    newPassword: z
+      .string({
+        message: "New password is required",
+      })
+      .min(6, "New password must be at least 6 characters"),
+  })
+  .refine((data) => data.oldPassword !== data.newPassword, {
+    message: "New password cannot be the same as the old password",
+    path: ["newPassword"],
+  });
 
 const verifyEmailZodSchema = z.object({
   email: z
