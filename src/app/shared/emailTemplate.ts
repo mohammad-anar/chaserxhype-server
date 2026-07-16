@@ -1,7 +1,7 @@
 import config from "../../config/index.js";
 import { IContact, ICreateAccount, IResetPassword, IWorkshopContact } from "../../types/emailTamplate.js";
 
-const PRIMARY_COLOR = "#00C6CF";
+const PRIMARY_COLOR = "#8B5A2B";
 
 const baseTemplate = (content: string) => `
 <body style="margin:0; padding:0; background-color:#f4f6f8; font-family:Arial, Helvetica, sans-serif;">
@@ -16,7 +16,7 @@ const baseTemplate = (content: string) => `
           <tr>
             <td align="center" style="padding-bottom:20px;">
               <h1 style="margin:0; font-size:22px; color:${PRIMARY_COLOR}; font-weight:700;">
-                FixMinCykel
+                Coffee Shop
               </h1>
             </td>
           </tr>
@@ -43,7 +43,7 @@ const baseTemplate = (content: string) => `
                 If you have any questions, contact our support team.
               </p>
               <p style="font-size:12px; color:#bbbbbb; margin-top:10px;">
-                © ${new Date().getFullYear()} FixMinCykel. All rights reserved.
+                © ${new Date().getFullYear()} Coffee Shop. All rights reserved.
               </p>
             </td>
           </tr>
@@ -65,7 +65,7 @@ const createAccount = (values: ICreateAccount) => {
     </h2>
 
     <p style="font-size:15px; line-height:1.7; color:#555; margin-bottom:25px;">
-      Thank you for creating an account with FixMinCykel.
+      Thank you for creating an account with Coffee Shop.
       Please use the verification code below to activate your account.
     </p>
 
@@ -94,7 +94,7 @@ const createAccount = (values: ICreateAccount) => {
 
   return {
     to: values.email,
-    subject: "Verify your FixMinCykel account",
+    subject: "Verify your Coffee Shop account",
     html: baseTemplate(content),
   };
 };
@@ -137,7 +137,7 @@ const resetPassword = (values: IResetPassword) => {
 
   return {
     to: values.email,
-    subject: "Reset your FixMinCykel password",
+    subject: "Reset your Coffee Shop password",
     html: baseTemplate(content),
   };
 };
@@ -185,6 +185,7 @@ const forgetPassword = (values: { email: string; token: string }) => {
     html: baseTemplate(content),
   };
 };
+
 const forgetPasswordWorkshop = (values: { email: string; token: string }) => {
   const content = `
     <h2 style="margin:0 0 20px 0; font-size:20px; color:#222;">
