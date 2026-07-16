@@ -11,6 +11,9 @@ import { MilkRouter } from "../modules/milk/milk.routes.js";
 import { ExtraRouter } from "../modules/extra/extra.routes.js";
 import { ProductRouter } from "../modules/product/product.routes.js";
 import { CoinProductRouter } from "../modules/coinProduct/coinProduct.routes.js";
+import { ProductSizeRouter } from "../modules/productSize/productSize.routes.js";
+import { ProductMilkRouter } from "../modules/productMilk/productMilk.routes.js";
+import { ProductExtraRouter } from "../modules/productExtra/productExtra.routes.js";
 
 const router = express.Router();
 
@@ -62,6 +65,18 @@ const moduleRoutes = [
   {
     path: "/coin-product",
     route: CoinProductRouter,
+  },
+  {
+    path: "/product-size",
+    route: ProductSizeRouter,
+  },
+  {
+    path: "/product-milk",
+    route: ProductMilkRouter,
+  },
+  {
+    path: "/product-extra",
+    route: ProductExtraRouter,
   },
 ];
 
