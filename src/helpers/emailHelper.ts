@@ -1,4 +1,4 @@
-import config from "../config/index.js" ;
+import config from "../config/index.js";
 import nodemailer from "nodemailer";
 
 export type ISendEmail = {
@@ -25,7 +25,7 @@ const transporter = nodemailer.createTransport({
 const sendEmail = async (values: ISendEmail) => {
   try {
     const info = await transporter.sendMail({
-      from: `"FixMinCykel" <${config.email.from}>`,
+      from: `"CoffeeShop" <${config.email.from}>`,
       to: values.to,
       subject: values.subject,
       html: values.html,

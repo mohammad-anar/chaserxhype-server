@@ -4,17 +4,14 @@ const createUserZodSchema = z.object({
   name: z.string({
     message: "Name is required",
   }),
-  email: z
-    .string({
-      message: "Email is required",
-    })
-    .email("Invalid email format"),
+  email: z.email("Invalid email format"),
   phone: z.string().optional(),
   password: z
     .string({
       message: "Password is required",
     })
     .min(6, "Password must be at least 6 characters"),
+  profileImage: z.string().optional(),
 });
 
 const updateUserProfileZodSchema = z.object({

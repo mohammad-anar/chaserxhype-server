@@ -56,6 +56,7 @@ const createUser = async (payload: ICreateUserPayload) => {
         role: UserRole.USER,
         status: UserStatus.ACTIVE, // default active but isVerified is false
         isVerified: false,
+        profileImage: payload.profileImage || null,
       },
     });
 

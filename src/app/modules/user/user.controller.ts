@@ -8,7 +8,13 @@ import { getSingleFilePath } from "../../shared/getFilePath.js";
 import ApiError from "../../../errors/ApiError.js";
 
 const createUser = catchAsync(async (req: Request, res: Response) => {
-  const result = await UserServices.createUser(req.body);
+  const profileImage = getSingleFilePath(req.files, "image");
+  const payload = {
+    ...req.body,
+    ...(profileImage && { profileImage }),
+  };
+
+  const result = await UserServices.createUser(payload);
 
   sendResponse(res, {
     statusCode: StatusCodes.CREATED,

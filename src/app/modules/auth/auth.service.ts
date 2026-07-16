@@ -20,49 +20,6 @@ import { UserStatus } from "@prisma/client";
 
 const JWT_SECRET = config.jwt.jwt_secret as Secret;
 
-const verifyEmail = async (payload: IVerifyOtpPayload) => {
-  const { email, otp } = payload;
-  if (!email || !otp) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, "Email and OTP are required");
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { email },
-  });
-
-  if (!user) {
-    throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
-  }
-
-  if (user.isVerified && !user.otpCode) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, "User is already verified");
-  }
-
-  if (!user.otpCode || !user.otpExpiresAt) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, "OTP has expired or is invalid");
-  }
-
-  if (new Date() > new Date(user.otpExpiresAt)) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, "OTP code has expired");
-  }
-
-  if (user.otpCode !== otp.toString()) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, "Incorrect OTP code");
-  }
-
-  const updatedUser = await prisma.user.update({
-    where: { email },
-    data: {
-      isVerified: true,
-      otpCode: null,
-      otpExpiresAt: null,
-      status: UserStatus.ACTIVE,
-    },
-  });
-
-  const { password, ...userWithoutPassword } = updatedUser;
-  return userWithoutPassword;
-};
 
 const loginUser = async (payload: ILoginPayload) => {
   const { email, password: inputPassword } = payload;
@@ -194,6 +151,50 @@ const forgotPassword = async (payload: IForgotPasswordPayload) => {
   return { message: "OTP sent successfully to your email" };
 };
 
+const verifyEmail = async (payload: IVerifyOtpPayload) => {
+  const { email, otp } = payload;
+  if (!email || !otp) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, "Email and OTP are required");
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { email },
+  });
+
+  if (!user) {
+    throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
+  }
+
+  if (user.isVerified && !user.otpCode) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, "User is already verified");
+  }
+
+  if (!user.otpCode || !user.otpExpiresAt) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, "OTP has expired or is invalid");
+  }
+
+  if (new Date() > new Date(user.otpExpiresAt)) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, "OTP code has expired");
+  }
+
+  if (user.otpCode !== otp.toString()) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, "Incorrect OTP code");
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { email },
+    data: {
+      isVerified: true,
+      otpCode: null,
+      otpExpiresAt: null,
+      status: UserStatus.ACTIVE,
+    },
+  });
+
+  const { password, ...userWithoutPassword } = updatedUser;
+  return userWithoutPassword;
+};
+
 const verifyOtp = async (payload: IVerifyOtpPayload) => {
   const { email, otp } = payload;
   if (!email || !otp) {
@@ -224,6 +225,9 @@ const verifyOtp = async (payload: IVerifyOtpPayload) => {
 
   return { resetToken };
 };
+
+
+
 
 const resetPassword = async (payload: IResetPasswordPayload) => {
   const { password, newPassword } = payload;

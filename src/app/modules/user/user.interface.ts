@@ -3,6 +3,7 @@ export type ICreateUserPayload = {
   email: string;
   password: string;
   phone?: string;
+  profileImage?: string;
 };
 
 export type IUserFilterableFields = {

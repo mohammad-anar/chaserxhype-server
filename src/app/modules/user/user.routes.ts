@@ -10,6 +10,7 @@ const router = express.Router();
 // Public User Signup
 router.post(
   "/create-user",
+  fileUploadHandler(),
   validateRequest(UserValidation.createUserZodSchema),
   UserController.createUser
 );
