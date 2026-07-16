@@ -89,13 +89,28 @@ const getAllSupportTickets = async (filters: ISupportTicketFilterableFields, opt
   const whereConditions: Prisma.SupportTicketWhereInput =
     andConditions.length > 0 ? { AND: andConditions } : {};
 
+  let orderBy: any = {};
+  if (sortBy === "name" || sortBy === "userName" || sortBy === "user.name") {
+    orderBy = {
+      user: {
+        name: sortOrder,
+      },
+    };
+  } else if (sortBy.toLowerCase() === "createdat" || sortBy.toLowerCase() === "created_at") {
+    orderBy = {
+      createdAt: sortOrder,
+    };
+  } else {
+    orderBy = {
+      [sortBy]: sortOrder,
+    };
+  }
+
   const result = await prisma.supportTicket.findMany({
     where: whereConditions,
     skip,
     take: limit,
-    orderBy: {
-      [sortBy]: sortOrder,
-    },
+    orderBy,
     include: {
       user: {
         select: {
