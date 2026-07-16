@@ -15,6 +15,29 @@ const verifyEmail = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const loginUser = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthService.loginUser(req.body);
+
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: "Logged in successfully",
+    data: result,
+  });
+});
+
+const changePassword = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.user.id;
+  const result = await AuthService.changePassword(userId, req.body);
+
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: "Password changed successfully.",
+    data: result,
+  });
+});
+
 const forgotPassword = catchAsync(async (req: Request, res: Response) => {
   const result = await AuthService.forgotPassword(req.body);
 
@@ -38,9 +61,14 @@ const verifyOtp = catchAsync(async (req: Request, res: Response) => {
 });
 
 const resetPassword = catchAsync(async (req: Request, res: Response) => {
+  let resetToken = req.headers.authorization || req.body.resetToken;
+  if (resetToken && resetToken.startsWith("Bearer ")) {
+    resetToken = resetToken.split(" ")[1];
+  }
+
   const payload = {
     ...req.body,
-    resetToken: req.headers.authorization || req.body.resetToken,
+    resetToken,
   };
   
   const result = await AuthService.resetPassword(payload);
@@ -66,6 +94,8 @@ const resendOtp = catchAsync(async (req: Request, res: Response) => {
 
 export const AuthController = {
   verifyEmail,
+  loginUser,
+  changePassword,
   forgotPassword,
   verifyOtp,
   resetPassword,

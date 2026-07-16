@@ -2,6 +2,13 @@ import app from "./app.js";
 import config from "./config/index.js";
 import { seedSuperAdmin } from "./db/seedSuperAdmin.js";
 
+if (config.node_env === "production") {
+  console.log = () => {};
+  console.info = () => {};
+  console.warn = () => {};
+  console.error = () => {};
+}
+
 let server: any;
 
 process.on("uncaughtException", (error) => {
