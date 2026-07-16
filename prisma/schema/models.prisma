@@ -21,6 +21,7 @@ model User {
     carts              Cart[]
     orders             Order[]
     payments           Payment[]
+    rewardPayments     RewardPayment[]
 
     @@map("users")
 }
@@ -306,6 +307,7 @@ model Order {
     updatedAt  DateTime    @updatedAt
     orderItems OrderItem[]
     payments   Payment[]
+    rewardPayments RewardPayment[]
 }
 
 model OrderItem {
@@ -375,3 +377,59 @@ model Payment {
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 }
+model RewardPayment {
+    id String @id @default(cuid())
+
+    orderId String
+    order   Order  @relation(fields: [orderId], references: [id])
+
+    userId String
+    user   User   @relation(fields: [userId], references: [id])
+
+    transactionId          String        @unique
+    status                 PaymentStatus @default(PENDING)
+    coin                   Int
+    paidAt                 DateTime      @default(now())
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+
+
+model Tax{
+    id String @id @default(cuid())
+    title String
+    description String?
+    amount Decimal
+    type TaxType
+    status TaxStatus @default(ACTIVE)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+model DeliveryFee {
+    id String @id @default(cuid())
+
+    title String
+    description String?
+    amount Decimal
+    status DeliveryFeeStatus @default(ACTIVE)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+model ServiceCharge {
+    id String @id @default(cuid())
+
+    title String
+    description String?
+    amount Decimal
+    status ServiceChargeStatus @default(ACTIVE)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+

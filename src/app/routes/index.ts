@@ -4,6 +4,7 @@ import { AuthRoutes } from "../modules/auth/auth.routes.js";
 import { AddressRouter } from "../modules/address/address.routes.js";
 import { WalletRouter } from "../modules/wallet/wallet.routes.js";
 import { SavedCardRouter } from "../modules/savedCard/savedCard.routes.js";
+import { SupportTicketRouter } from "../modules/supportTicket/supportTicket.routes.js";
 
 const router = express.Router();
 
@@ -27,6 +28,10 @@ const moduleRoutes = [
   {
     path: "/saved-card",
     route: SavedCardRouter,
+  },
+  {
+    path: "/support-ticket",
+    route: SupportTicketRouter,
   },
 ];
 

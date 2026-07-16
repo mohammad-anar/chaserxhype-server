@@ -64,3 +64,25 @@ enum PayType {
     APPLE_PAY
     GOOGLE_PAY
 }
+
+
+enum TaxType {
+    PERCENTAGE
+    FIXED
+}
+
+enum TaxStatus {
+    ACTIVE
+    INACTIVE
+}
+
+
+enum DeliveryFeeStatus {
+    ACTIVE
+    INACTIVE
+}
+
+enum ServiceChargeStatus {
+    ACTIVE
+    INACTIVE
+}
