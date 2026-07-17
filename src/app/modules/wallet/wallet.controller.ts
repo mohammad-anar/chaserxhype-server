@@ -30,7 +30,21 @@ const getAllWallets = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const addFunds = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.user.id;
+  const result = await WalletServices.addFunds(userId, req.body);
+
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: "Funds added successfully",
+    data: result,
+  });
+});
+
 export const WalletController = {
   getMyWallet,
   getAllWallets,
+  addFunds,
 };
+

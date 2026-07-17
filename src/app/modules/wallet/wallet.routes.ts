@@ -18,4 +18,12 @@ router.get(
   WalletController.getAllWallets
 );
 
+router.post(
+  "/add-funds",
+  auth("USER"),
+  validateRequest(WalletValidation.addFundsZodSchema),
+  WalletController.addFunds
+);
+
 export const WalletRouter = router;
+

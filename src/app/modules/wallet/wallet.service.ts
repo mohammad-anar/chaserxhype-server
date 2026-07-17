@@ -53,7 +53,37 @@ const getAllWallets = async (options: any) => {
   };
 };
 
+const addFunds = async (userId: string, payload: { amount: number }) => {
+  const { amount } = payload;
+
+  let wallet = await prisma.wallet.findFirst({
+    where: { userId },
+  });
+
+  if (!wallet) {
+    wallet = await prisma.wallet.create({
+      data: {
+        userId,
+        balance: amount,
+      },
+    });
+  } else {
+    wallet = await prisma.wallet.update({
+      where: { id: wallet.id },
+      data: {
+        balance: {
+          increment: amount,
+        },
+      },
+    });
+  }
+
+  return wallet;
+};
+
 export const WalletServices = {
   getMyWallet,
   getAllWallets,
+  addFunds,
 };
+
