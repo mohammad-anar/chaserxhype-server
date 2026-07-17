@@ -1,10 +1,10 @@
 export type ICreateCoinProductPayload = {
-  name: string;
+  productId: string;
   needPoint: number;
 };
 
 export type IUpdateCoinProductPayload = {
-  name?: string;
+  productId?: string;
   needPoint?: number;
 };
 

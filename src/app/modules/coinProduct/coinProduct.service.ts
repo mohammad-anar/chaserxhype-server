@@ -6,8 +6,23 @@ import { Prisma } from "@prisma/client";
 import { ICreateCoinProductPayload, ICoinProductFilterableFields, IUpdateCoinProductPayload } from "./coinProduct.interface.js";
 
 const createCoinProduct = async (payload: ICreateCoinProductPayload) => {
+  const product = await prisma.product.findUnique({
+    where: { id: payload.productId },
+  });
+
+  if (!product || product.isDeleted) {
+    throw new ApiError(StatusCodes.NOT_FOUND, "Associated product not found");
+  }
+
   const result = await prisma.coinProduct.create({
-    data: payload,
+    data: {
+      productId: payload.productId,
+      name: product.slug, // Pull name from product slug
+      needPoint: payload.needPoint,
+    },
+    include: {
+      product: true,
+    },
   });
   return result;
 };
@@ -45,6 +60,9 @@ const getAllCoinProducts = async (filters: ICoinProductFilterableFields, options
     skip,
     take: limit,
     orderBy: orderConfig,
+    include: {
+      product: true,
+    },
   });
 
   const total = await prisma.coinProduct.count({
@@ -64,6 +82,9 @@ const getAllCoinProducts = async (filters: ICoinProductFilterableFields, options
 const getCoinProductById = async (id: string) => {
   const coinProduct = await prisma.coinProduct.findUnique({
     where: { id },
+    include: {
+      product: true,
+    },
   });
 
   if (!coinProduct || coinProduct.isDeleted) {
@@ -82,9 +103,24 @@ const updateCoinProduct = async (id: string, payload: IUpdateCoinProductPayload)
     throw new ApiError(StatusCodes.NOT_FOUND, "Coin product not found");
   }
 
+  const updateData: any = { ...payload };
+
+  if (payload.productId) {
+    const product = await prisma.product.findUnique({
+      where: { id: payload.productId },
+    });
+    if (!product || product.isDeleted) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Associated product not found");
+    }
+    updateData.name = product.slug;
+  }
+
   const result = await prisma.coinProduct.update({
     where: { id },
-    data: payload,
+    data: updateData,
+    include: {
+      product: true,
+    },
   });
 
   return result;

@@ -18,25 +18,25 @@ const createProduct = catchAsync(async (req: Request, res: Response) => {
   if (body.customOption === "true") body.customOption = true;
   if (body.customOption === "false") body.customOption = false;
 
-  if (typeof body.sizes === "string") {
+  if (typeof body.productSize === "string") {
     try {
-      body.sizes = JSON.parse(body.sizes);
+      body.productSize = JSON.parse(body.productSize);
     } catch (e) {
-      body.sizes = [];
+      body.productSize = [];
     }
   }
-  if (typeof body.milks === "string") {
+  if (typeof body.productMilk === "string") {
     try {
-      body.milks = JSON.parse(body.milks);
+      body.productMilk = JSON.parse(body.productMilk);
     } catch (e) {
-      body.milks = [];
+      body.productMilk = [];
     }
   }
-  if (typeof body.extras === "string") {
+  if (typeof body.productExtra === "string") {
     try {
-      body.extras = JSON.parse(body.extras);
+      body.productExtra = JSON.parse(body.productExtra);
     } catch (e) {
-      body.extras = [];
+      body.productExtra = [];
     }
   }
 
@@ -100,25 +100,25 @@ const updateProduct = catchAsync(async (req: Request, res: Response) => {
   if (body.customOption === "true") body.customOption = true;
   if (body.customOption === "false") body.customOption = false;
 
-  if (typeof body.sizes === "string") {
+  if (typeof body.productSize === "string") {
     try {
-      body.sizes = JSON.parse(body.sizes);
+      body.productSize = JSON.parse(body.productSize);
     } catch (e) {
-      body.sizes = undefined;
+      body.productSize = undefined;
     }
   }
-  if (typeof body.milks === "string") {
+  if (typeof body.productMilk === "string") {
     try {
-      body.milks = JSON.parse(body.milks);
+      body.productMilk = JSON.parse(body.productMilk);
     } catch (e) {
-      body.milks = undefined;
+      body.productMilk = undefined;
     }
   }
-  if (typeof body.extras === "string") {
+  if (typeof body.productExtra === "string") {
     try {
-      body.extras = JSON.parse(body.extras);
+      body.productExtra = JSON.parse(body.productExtra);
     } catch (e) {
-      body.extras = undefined;
+      body.productExtra = undefined;
     }
   }
 

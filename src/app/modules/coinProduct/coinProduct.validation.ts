@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 const createCoinProductZodSchema = z.object({
-  name: z.string({
-    message: "Name is required",
+  productId: z.string({
+    message: "Product ID is required",
   }),
   needPoint: z
     .number({
@@ -13,7 +13,7 @@ const createCoinProductZodSchema = z.object({
 });
 
 const updateCoinProductZodSchema = z.object({
-  name: z.string().optional(),
+  productId: z.string().optional(),
   needPoint: z
     .number()
     .int("needPoint must be an integer")

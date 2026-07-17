@@ -2,7 +2,6 @@ import { AdjustmentType } from "@prisma/client";
 
 export type ICreateProductSizeInput = {
   sizeId: string;
-  name: string;
   oz: string;
   priceAdjustment: number;
   adjustmentType: AdjustmentType;
@@ -10,15 +9,31 @@ export type ICreateProductSizeInput = {
 
 export type ICreateProductMilkInput = {
   milkId: string;
-  name: string;
   priceAdjustment: number;
   adjustmentType: AdjustmentType;
 };
 
 export type ICreateProductExtraInput = {
   extraId: string;
-  name: string;
   price: number;
+};
+
+export type IUpdateProductSizeInput = {
+  id: string; // Required to target the specific variation record
+  oz?: string;
+  priceAdjustment?: number;
+  adjustmentType?: AdjustmentType;
+};
+
+export type IUpdateProductMilkInput = {
+  id: string; // Required to target the specific variation record
+  priceAdjustment?: number;
+  adjustmentType?: AdjustmentType;
+};
+
+export type IUpdateProductExtraInput = {
+  id: string; // Required to target the specific variation record
+  price?: number;
 };
 
 export type ICreateProductPayload = {
@@ -30,9 +45,9 @@ export type ICreateProductPayload = {
   coin: number;
   customOption?: boolean;
   image?: string[];
-  sizes?: ICreateProductSizeInput[];
-  milks?: ICreateProductMilkInput[];
-  extras?: ICreateProductExtraInput[];
+  productSize?: ICreateProductSizeInput[];
+  productMilk?: ICreateProductMilkInput[];
+  productExtra?: ICreateProductExtraInput[];
 };
 
 export type IUpdateProductPayload = {
@@ -44,9 +59,9 @@ export type IUpdateProductPayload = {
   coin?: number;
   customOption?: boolean;
   image?: string[];
-  sizes?: ICreateProductSizeInput[];
-  milks?: ICreateProductMilkInput[];
-  extras?: ICreateProductExtraInput[];
+  productSize?: IUpdateProductSizeInput[];
+  productMilk?: IUpdateProductMilkInput[];
+  productExtra?: IUpdateProductExtraInput[];
 };
 
 export type IProductFilterableFields = {

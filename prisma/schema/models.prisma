@@ -118,6 +118,8 @@ model Product {
     productExtras ProductExtra[]
     cartItems     CartItem[]
     orderItems    OrderItem[]
+
+    coinProducts CoinProduct[]
 }
 
 model Size {
@@ -208,6 +210,9 @@ model ProductExtra {
 model CoinProduct {
     id        String  @id @default(cuid())
     name      String
+    productId String
+    product   Product @relation(fields: [productId], references: [id])
+
     needPoint Int
     isDeleted Boolean @default(false)
 

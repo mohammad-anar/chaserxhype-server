@@ -7,7 +7,7 @@ import { Prisma } from "@prisma/client";
 import { ICreateProductPayload, IProductFilterableFields, IUpdateProductPayload } from "./product.interface.js";
 
 const createProduct = async (payload: ICreateProductPayload) => {
-  const { sizes, milks, extras, name, ...productData } = payload;
+  const { productSize, productMilk, productExtra, name, ...productData } = payload;
 
   const slug = slugify(name, { lower: true, strict: true }) + "-" + Date.now();
 
@@ -20,42 +20,72 @@ const createProduct = async (payload: ICreateProductPayload) => {
       },
     });
 
-    // Create ProductSizes
-    if (sizes && sizes.length > 0) {
+    // Create ProductSizes (pull names dynamically from master list)
+    if (productSize && productSize.length > 0) {
+      const sizeItems = [];
+      for (const item of productSize) {
+        const sizeRecord = await tx.size.findUnique({
+          where: { id: item.sizeId },
+        });
+        if (!sizeRecord) {
+          throw new ApiError(StatusCodes.NOT_FOUND, `Size with ID ${item.sizeId} not found`);
+        }
+        sizeItems.push({
+          productId: product.id,
+          sizeId: item.sizeId,
+          name: sizeRecord.name, // Pulled from Size model
+          oz: item.oz,
+          priceAdjustment: item.priceAdjustment,
+          adjustmentType: item.adjustmentType,
+        });
+      }
       await tx.productSize.createMany({
-        data: sizes.map((size) => ({
-          productId: product.id,
-          sizeId: size.sizeId,
-          name: size.name,
-          oz: size.oz,
-          priceAdjustment: size.priceAdjustment,
-          adjustmentType: size.adjustmentType,
-        })),
+        data: sizeItems,
       });
     }
 
-    // Create ProductMilks
-    if (milks && milks.length > 0) {
+    // Create ProductMilks (pull names dynamically from master list)
+    if (productMilk && productMilk.length > 0) {
+      const milkItems = [];
+      for (const item of productMilk) {
+        const milkRecord = await tx.milk.findUnique({
+          where: { id: item.milkId },
+        });
+        if (!milkRecord) {
+          throw new ApiError(StatusCodes.NOT_FOUND, `Milk with ID ${item.milkId} not found`);
+        }
+        milkItems.push({
+          productId: product.id,
+          milkId: item.milkId,
+          name: milkRecord.name, // Pulled from Milk model
+          priceAdjustment: item.priceAdjustment,
+          adjustmentType: item.adjustmentType,
+        });
+      }
       await tx.productMilk.createMany({
-        data: milks.map((milk) => ({
-          productId: product.id,
-          milkId: milk.milkId,
-          name: milk.name,
-          priceAdjustment: milk.priceAdjustment,
-          adjustmentType: milk.adjustmentType,
-        })),
+        data: milkItems,
       });
     }
 
-    // Create ProductExtras
-    if (extras && extras.length > 0) {
-      await tx.productExtra.createMany({
-        data: extras.map((extra) => ({
+    // Create ProductExtras (pull names dynamically from master list)
+    if (productExtra && productExtra.length > 0) {
+      const extraItems = [];
+      for (const item of productExtra) {
+        const extraRecord = await tx.extra.findUnique({
+          where: { id: item.extraId },
+        });
+        if (!extraRecord) {
+          throw new ApiError(StatusCodes.NOT_FOUND, `Extra option with ID ${item.extraId} not found`);
+        }
+        extraItems.push({
           productId: product.id,
-          extraId: extra.extraId,
-          name: extra.name,
-          price: extra.price,
-        })),
+          extraId: item.extraId,
+          name: extraRecord.name, // Pulled from Extra model
+          price: item.price,
+        });
+      }
+      await tx.productExtra.createMany({
+        data: extraItems,
       });
     }
 
@@ -200,7 +230,7 @@ const getProductById = async (id: string) => {
 };
 
 const updateProduct = async (id: string, payload: IUpdateProductPayload) => {
-  const { sizes, milks, extras, name, ...productData } = payload;
+  const { productSize, productMilk, productExtra, name, ...productData } = payload;
 
   const product = await prisma.product.findUnique({
     where: { id },
@@ -223,50 +253,68 @@ const updateProduct = async (id: string, payload: IUpdateProductPayload) => {
       data: updatedData,
     });
 
-    // Overwrite sizes if provided
-    if (sizes !== undefined) {
-      await tx.productSize.deleteMany({ where: { productId: id } });
-      if (sizes.length > 0) {
-        await tx.productSize.createMany({
-          data: sizes.map((size) => ({
-            productId: id,
-            sizeId: size.sizeId,
-            name: size.name,
-            oz: size.oz,
-            priceAdjustment: size.priceAdjustment,
-            adjustmentType: size.adjustmentType,
-          })),
+    // Update sizes in-place if provided (only update by ID, cannot delete/recreate)
+    if (productSize !== undefined && productSize.length > 0) {
+      for (const item of productSize) {
+        const sizeRecord = await tx.productSize.findFirst({
+          where: { id: item.id, productId: id },
+        });
+        if (!sizeRecord) {
+          throw new ApiError(
+            StatusCodes.NOT_FOUND,
+            `ProductSize record with ID ${item.id} not found for this product`
+          );
+        }
+        await tx.productSize.update({
+          where: { id: item.id },
+          data: {
+            oz: item.oz,
+            priceAdjustment: item.priceAdjustment,
+            adjustmentType: item.adjustmentType,
+          },
         });
       }
     }
 
-    // Overwrite milks if provided
-    if (milks !== undefined) {
-      await tx.productMilk.deleteMany({ where: { productId: id } });
-      if (milks.length > 0) {
-        await tx.productMilk.createMany({
-          data: milks.map((milk) => ({
-            productId: id,
-            milkId: milk.milkId,
-            name: milk.name,
-            priceAdjustment: milk.priceAdjustment,
-            adjustmentType: milk.adjustmentType,
-          })),
+    // Update milks in-place if provided
+    if (productMilk !== undefined && productMilk.length > 0) {
+      for (const item of productMilk) {
+        const milkRecord = await tx.productMilk.findFirst({
+          where: { id: item.id, productId: id },
+        });
+        if (!milkRecord) {
+          throw new ApiError(
+            StatusCodes.NOT_FOUND,
+            `ProductMilk record with ID ${item.id} not found for this product`
+          );
+        }
+        await tx.productMilk.update({
+          where: { id: item.id },
+          data: {
+            priceAdjustment: item.priceAdjustment,
+            adjustmentType: item.adjustmentType,
+          },
         });
       }
     }
 
-    // Overwrite extras if provided
-    if (extras !== undefined) {
-      await tx.productExtra.deleteMany({ where: { productId: id } });
-      if (extras.length > 0) {
-        await tx.productExtra.createMany({
-          data: extras.map((extra) => ({
-            productId: id,
-            extraId: extra.extraId,
-            name: extra.name,
-            price: extra.price,
-          })),
+    // Update extras in-place if provided
+    if (productExtra !== undefined && productExtra.length > 0) {
+      for (const item of productExtra) {
+        const extraRecord = await tx.productExtra.findFirst({
+          where: { id: item.id, productId: id },
+        });
+        if (!extraRecord) {
+          throw new ApiError(
+            StatusCodes.NOT_FOUND,
+            `ProductExtra record with ID ${item.id} not found for this product`
+          );
+        }
+        await tx.productExtra.update({
+          where: { id: item.id },
+          data: {
+            price: item.price,
+          },
         });
       }
     }

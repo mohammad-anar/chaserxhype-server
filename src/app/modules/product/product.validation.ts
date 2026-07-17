@@ -21,11 +21,10 @@ const createProductZodSchema = z.object({
   }),
   customOption: z.boolean().optional(),
   image: z.array(z.string()).optional(),
-  sizes: z
+  productSize: z
     .array(
       z.object({
         sizeId: z.string({ message: "Size ID is required" }),
-        name: z.string({ message: "Size name is required" }),
         oz: z.string({ message: "Ounces is required" }),
         priceAdjustment: z.number({ message: "Price adjustment must be a number" }),
         adjustmentType: z.enum(["ADD", "SUBTRACT"], {
@@ -34,11 +33,10 @@ const createProductZodSchema = z.object({
       })
     )
     .optional(),
-  milks: z
+  productMilk: z
     .array(
       z.object({
         milkId: z.string({ message: "Milk ID is required" }),
-        name: z.string({ message: "Milk name is required" }),
         priceAdjustment: z.number({ message: "Price adjustment must be a number" }),
         adjustmentType: z.enum(["ADD", "SUBTRACT"], {
           message: "Adjustment type must be ADD or SUBTRACT",
@@ -46,11 +44,10 @@ const createProductZodSchema = z.object({
       })
     )
     .optional(),
-  extras: z
+  productExtra: z
     .array(
       z.object({
         extraId: z.string({ message: "Extra ID is required" }),
-        name: z.string({ message: "Extra name is required" }),
         price: z.number({ message: "Price must be a number" }),
       })
     )
@@ -66,32 +63,29 @@ const updateProductZodSchema = z.object({
   coin: z.number().optional(),
   customOption: z.boolean().optional(),
   image: z.array(z.string()).optional(),
-  sizes: z
+  productSize: z
     .array(
       z.object({
-        sizeId: z.string().optional(),
-        name: z.string().optional(),
+        id: z.string({ message: "ProductSize record ID is required for update" }),
         oz: z.string().optional(),
         priceAdjustment: z.number().optional(),
         adjustmentType: z.enum(["ADD", "SUBTRACT"]).optional(),
       })
     )
     .optional(),
-  milks: z
+  productMilk: z
     .array(
       z.object({
-        milkId: z.string().optional(),
-        name: z.string().optional(),
+        id: z.string({ message: "ProductMilk record ID is required for update" }),
         priceAdjustment: z.number().optional(),
         adjustmentType: z.enum(["ADD", "SUBTRACT"]).optional(),
       })
     )
     .optional(),
-  extras: z
+  productExtra: z
     .array(
       z.object({
-        extraId: z.string().optional(),
-        name: z.string().optional(),
+        id: z.string({ message: "ProductExtra record ID is required for update" }),
         price: z.number().optional(),
       })
     )

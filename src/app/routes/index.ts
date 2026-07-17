@@ -14,6 +14,10 @@ import { CoinProductRouter } from "../modules/coinProduct/coinProduct.routes.js"
 import { ProductSizeRouter } from "../modules/productSize/productSize.routes.js";
 import { ProductMilkRouter } from "../modules/productMilk/productMilk.routes.js";
 import { ProductExtraRouter } from "../modules/productExtra/productExtra.routes.js";
+import { TaxRouter } from "../modules/tax/tax.routes.js";
+import { DeliveryFeeRouter } from "../modules/deliveryFee/deliveryFee.routes.js";
+import { ServiceChargeRouter } from "../modules/serviceCharge/serviceCharge.routes.js";
+import { CartRouter } from "../modules/cart/cart.routes.js";
 
 const router = express.Router();
 
@@ -77,6 +81,22 @@ const moduleRoutes = [
   {
     path: "/product-extra",
     route: ProductExtraRouter,
+  },
+  {
+    path: "/tax",
+    route: TaxRouter,
+  },
+  {
+    path: "/delivery-fee",
+    route: DeliveryFeeRouter,
+  },
+  {
+    path: "/service-charge",
+    route: ServiceChargeRouter,
+  },
+  {
+    path: "/cart",
+    route: CartRouter,
   },
 ];
 
