@@ -8,7 +8,6 @@ const createProductExtra = async (payload: ICreateProductExtraPayload) => {
     data: payload,
     include: {
       product: true,
-      extra: true,
     },
   });
   return result;
@@ -19,7 +18,6 @@ const getAllProductExtras = async (productId?: string) => {
     where: productId ? { productId } : {},
     include: {
       product: true,
-      extra: true,
     },
     orderBy: {
       name: "asc",
@@ -33,7 +31,6 @@ const getProductExtraById = async (id: string) => {
     where: { id },
     include: {
       product: true,
-      extra: true,
     },
   });
 
@@ -58,7 +55,6 @@ const updateProductExtra = async (id: string, payload: IUpdateProductExtraPayloa
     data: payload,
     include: {
       product: true,
-      extra: true,
     },
   });
 

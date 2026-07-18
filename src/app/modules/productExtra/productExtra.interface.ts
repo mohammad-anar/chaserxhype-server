@@ -1,6 +1,5 @@
 export type ICreateProductExtraPayload = {
   productId: string;
-  extraId: string;
   name: string;
   price: number;
 };

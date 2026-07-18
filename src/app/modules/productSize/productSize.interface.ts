@@ -2,7 +2,6 @@ import { AdjustmentType } from "@prisma/client";
 
 export type ICreateProductSizePayload = {
   productId: string;
-  sizeId: string;
   name: string;
   oz: string;
   priceAdjustment: number;

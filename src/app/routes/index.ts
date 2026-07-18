@@ -6,9 +6,6 @@ import { WalletRouter } from "../modules/wallet/wallet.routes.js";
 import { SavedCardRouter } from "../modules/savedCard/savedCard.routes.js";
 import { SupportTicketRouter } from "../modules/supportTicket/supportTicket.routes.js";
 import { CategoryRouter } from "../modules/category/category.routes.js";
-import { SizeRouter } from "../modules/size/size.routes.js";
-import { MilkRouter } from "../modules/milk/milk.routes.js";
-import { ExtraRouter } from "../modules/extra/extra.routes.js";
 import { ProductRouter } from "../modules/product/product.routes.js";
 import { CoinProductRouter } from "../modules/coinProduct/coinProduct.routes.js";
 import { ProductSizeRouter } from "../modules/productSize/productSize.routes.js";
@@ -49,18 +46,6 @@ const moduleRoutes = [
   {
     path: "/category",
     route: CategoryRouter,
-  },
-  {
-    path: "/size",
-    route: SizeRouter,
-  },
-  {
-    path: "/milk",
-    route: MilkRouter,
-  },
-  {
-    path: "/extra",
-    route: ExtraRouter,
   },
   {
     path: "/product",

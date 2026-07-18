@@ -8,7 +8,6 @@ const createProductSize = async (payload: ICreateProductSizePayload) => {
     data: payload,
     include: {
       product: true,
-      size: true,
     },
   });
   return result;
@@ -19,7 +18,6 @@ const getAllProductSizes = async (productId?: string) => {
     where: productId ? { productId } : {},
     include: {
       product: true,
-      size: true,
     },
     orderBy: {
       name: "asc",
@@ -33,7 +31,6 @@ const getProductSizeById = async (id: string) => {
     where: { id },
     include: {
       product: true,
-      size: true,
     },
   });
 
@@ -58,7 +55,6 @@ const updateProductSize = async (id: string, payload: IUpdateProductSizePayload)
     data: payload,
     include: {
       product: true,
-      size: true,
     },
   });
 

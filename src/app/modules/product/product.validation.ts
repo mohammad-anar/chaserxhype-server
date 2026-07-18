@@ -24,7 +24,7 @@ const createProductZodSchema = z.object({
   productSize: z
     .array(
       z.object({
-        sizeId: z.string({ message: "Size ID is required" }),
+        name: z.string({ message: "Size name is required" }),
         oz: z.string({ message: "Ounces is required" }),
         priceAdjustment: z.number({ message: "Price adjustment must be a number" }),
         adjustmentType: z.enum(["ADD", "SUBTRACT"], {
@@ -36,7 +36,7 @@ const createProductZodSchema = z.object({
   productMilk: z
     .array(
       z.object({
-        milkId: z.string({ message: "Milk ID is required" }),
+        name: z.string({ message: "Milk name is required" }),
         priceAdjustment: z.number({ message: "Price adjustment must be a number" }),
         adjustmentType: z.enum(["ADD", "SUBTRACT"], {
           message: "Adjustment type must be ADD or SUBTRACT",
@@ -47,7 +47,7 @@ const createProductZodSchema = z.object({
   productExtra: z
     .array(
       z.object({
-        extraId: z.string({ message: "Extra ID is required" }),
+        name: z.string({ message: "Extra name is required" }),
         price: z.number({ message: "Price must be a number" }),
       })
     )
@@ -67,6 +67,7 @@ const updateProductZodSchema = z.object({
     .array(
       z.object({
         id: z.string({ message: "ProductSize record ID is required for update" }),
+        name: z.string().optional(),
         oz: z.string().optional(),
         priceAdjustment: z.number().optional(),
         adjustmentType: z.enum(["ADD", "SUBTRACT"]).optional(),
@@ -77,6 +78,7 @@ const updateProductZodSchema = z.object({
     .array(
       z.object({
         id: z.string({ message: "ProductMilk record ID is required for update" }),
+        name: z.string().optional(),
         priceAdjustment: z.number().optional(),
         adjustmentType: z.enum(["ADD", "SUBTRACT"]).optional(),
       })
@@ -86,6 +88,7 @@ const updateProductZodSchema = z.object({
     .array(
       z.object({
         id: z.string({ message: "ProductExtra record ID is required for update" }),
+        name: z.string().optional(),
         price: z.number().optional(),
       })
     )

@@ -87,7 +87,7 @@ model SupportTicket {
 
 model Category {
     id        String  @id @default(cuid())
-    name      String
+    name      String  @unique
     isActive  Boolean @default(true)
     isDeleted Boolean @default(false)
 
@@ -102,7 +102,8 @@ model Product {
     categoryId String
     category   Category @relation(fields: [categoryId], references: [id])
 
-    slug             String
+    name             String @unique
+    slug             String @unique
     shortDescription String
     description      String
     basePrice        Decimal
@@ -122,32 +123,6 @@ model Product {
     coinProducts CoinProduct[]
 }
 
-model Size {
-    id   String @id @default(cuid())
-    name String
-
-    createdAt    DateTime      @default(now())
-    updatedAt    DateTime      @updatedAt
-    productSizes ProductSize[]
-}
-
-model Milk {
-    id   String @id @default(cuid())
-    name String
-
-    createdAt    DateTime      @default(now())
-    updatedAt    DateTime      @updatedAt
-    productMilks ProductMilk[]
-}
-
-model Extra {
-    id   String @id @default(cuid())
-    name String
-
-    createdAt     DateTime       @default(now())
-    updatedAt     DateTime       @updatedAt
-    productExtras ProductExtra[]
-}
 
 
 model ProductSize {
@@ -155,9 +130,6 @@ model ProductSize {
 
     productId String
     product   Product @relation(fields: [productId], references: [id])
-
-    sizeId String
-    size   Size   @relation(fields: [sizeId], references: [id])
 
     name            String
     oz              String
@@ -176,9 +148,6 @@ model ProductMilk {
     productId String
     product   Product @relation(fields: [productId], references: [id])
 
-    milkId String
-    milk   Milk   @relation(fields: [milkId], references: [id])
-
     name            String
     priceAdjustment Decimal
     adjustmentType  AdjustmentType
@@ -194,9 +163,6 @@ model ProductExtra {
 
     productId String
     product   Product @relation(fields: [productId], references: [id])
-
-    extraId String
-    extra   Extra  @relation(fields: [extraId], references: [id])
 
     name  String
     price Decimal

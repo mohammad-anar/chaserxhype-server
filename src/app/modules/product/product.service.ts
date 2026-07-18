@@ -20,72 +20,39 @@ const createProduct = async (payload: ICreateProductPayload) => {
       },
     });
 
-    // Create ProductSizes (pull names dynamically from master list)
+    // Create ProductSizes
     if (productSize && productSize.length > 0) {
-      const sizeItems = [];
-      for (const item of productSize) {
-        const sizeRecord = await tx.size.findUnique({
-          where: { id: item.sizeId },
-        });
-        if (!sizeRecord) {
-          throw new ApiError(StatusCodes.NOT_FOUND, `Size with ID ${item.sizeId} not found`);
-        }
-        sizeItems.push({
+      await tx.productSize.createMany({
+        data: productSize.map((item) => ({
           productId: product.id,
-          sizeId: item.sizeId,
-          name: sizeRecord.name, // Pulled from Size model
+          name: item.name,
           oz: item.oz,
           priceAdjustment: item.priceAdjustment,
           adjustmentType: item.adjustmentType,
-        });
-      }
-      await tx.productSize.createMany({
-        data: sizeItems,
+        })),
       });
     }
 
-    // Create ProductMilks (pull names dynamically from master list)
+    // Create ProductMilks
     if (productMilk && productMilk.length > 0) {
-      const milkItems = [];
-      for (const item of productMilk) {
-        const milkRecord = await tx.milk.findUnique({
-          where: { id: item.milkId },
-        });
-        if (!milkRecord) {
-          throw new ApiError(StatusCodes.NOT_FOUND, `Milk with ID ${item.milkId} not found`);
-        }
-        milkItems.push({
+      await tx.productMilk.createMany({
+        data: productMilk.map((item) => ({
           productId: product.id,
-          milkId: item.milkId,
-          name: milkRecord.name, // Pulled from Milk model
+          name: item.name,
           priceAdjustment: item.priceAdjustment,
           adjustmentType: item.adjustmentType,
-        });
-      }
-      await tx.productMilk.createMany({
-        data: milkItems,
+        })),
       });
     }
 
-    // Create ProductExtras (pull names dynamically from master list)
+    // Create ProductExtras
     if (productExtra && productExtra.length > 0) {
-      const extraItems = [];
-      for (const item of productExtra) {
-        const extraRecord = await tx.extra.findUnique({
-          where: { id: item.extraId },
-        });
-        if (!extraRecord) {
-          throw new ApiError(StatusCodes.NOT_FOUND, `Extra option with ID ${item.extraId} not found`);
-        }
-        extraItems.push({
-          productId: product.id,
-          extraId: item.extraId,
-          name: extraRecord.name, // Pulled from Extra model
-          price: item.price,
-        });
-      }
       await tx.productExtra.createMany({
-        data: extraItems,
+        data: productExtra.map((item) => ({
+          productId: product.id,
+          name: item.name,
+          price: item.price,
+        })),
       });
     }
 
@@ -268,6 +235,7 @@ const updateProduct = async (id: string, payload: IUpdateProductPayload) => {
         await tx.productSize.update({
           where: { id: item.id },
           data: {
+            name: item.name,
             oz: item.oz,
             priceAdjustment: item.priceAdjustment,
             adjustmentType: item.adjustmentType,
@@ -291,6 +259,7 @@ const updateProduct = async (id: string, payload: IUpdateProductPayload) => {
         await tx.productMilk.update({
           where: { id: item.id },
           data: {
+            name: item.name,
             priceAdjustment: item.priceAdjustment,
             adjustmentType: item.adjustmentType,
           },
@@ -313,6 +282,7 @@ const updateProduct = async (id: string, payload: IUpdateProductPayload) => {
         await tx.productExtra.update({
           where: { id: item.id },
           data: {
+            name: item.name,
             price: item.price,
           },
         });

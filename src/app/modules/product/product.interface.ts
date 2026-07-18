@@ -1,25 +1,26 @@
 import { AdjustmentType } from "@prisma/client";
 
 export type ICreateProductSizeInput = {
-  sizeId: string;
+  name: string;
   oz: string;
   priceAdjustment: number;
   adjustmentType: AdjustmentType;
 };
 
 export type ICreateProductMilkInput = {
-  milkId: string;
+  name: string;
   priceAdjustment: number;
   adjustmentType: AdjustmentType;
 };
 
 export type ICreateProductExtraInput = {
-  extraId: string;
+  name: string;
   price: number;
 };
 
 export type IUpdateProductSizeInput = {
   id: string; // Required to target the specific variation record
+  name?: string;
   oz?: string;
   priceAdjustment?: number;
   adjustmentType?: AdjustmentType;
@@ -27,12 +28,14 @@ export type IUpdateProductSizeInput = {
 
 export type IUpdateProductMilkInput = {
   id: string; // Required to target the specific variation record
+  name?: string;
   priceAdjustment?: number;
   adjustmentType?: AdjustmentType;
 };
 
 export type IUpdateProductExtraInput = {
   id: string; // Required to target the specific variation record
+  name?: string;
   price?: number;
 };
 

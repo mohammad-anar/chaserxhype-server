@@ -8,7 +8,6 @@ const createProductMilk = async (payload: ICreateProductMilkPayload) => {
     data: payload,
     include: {
       product: true,
-      milk: true,
     },
   });
   return result;
@@ -19,7 +18,6 @@ const getAllProductMilks = async (productId?: string) => {
     where: productId ? { productId } : {},
     include: {
       product: true,
-      milk: true,
     },
     orderBy: {
       name: "asc",
@@ -33,7 +31,6 @@ const getProductMilkById = async (id: string) => {
     where: { id },
     include: {
       product: true,
-      milk: true,
     },
   });
 
@@ -58,7 +55,6 @@ const updateProductMilk = async (id: string, payload: IUpdateProductMilkPayload)
     data: payload,
     include: {
       product: true,
-      milk: true,
     },
   });
 
