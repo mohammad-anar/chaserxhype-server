@@ -15,6 +15,8 @@ import { TaxRouter } from "../modules/tax/tax.routes.js";
 import { DeliveryFeeRouter } from "../modules/deliveryFee/deliveryFee.routes.js";
 import { ServiceChargeRouter } from "../modules/serviceCharge/serviceCharge.routes.js";
 import { CartRouter } from "../modules/cart/cart.routes.js";
+import { OrderRouter } from "../modules/order/order.routes.js";
+import { PaymentRouter } from "../modules/payment/payment.routes.js";
 
 const router = express.Router();
 
@@ -82,6 +84,14 @@ const moduleRoutes = [
   {
     path: "/cart",
     route: CartRouter,
+  },
+  {
+    path: "/order",
+    route: OrderRouter,
+  },
+  {
+    path: "/payment",
+    route: PaymentRouter,
   },
 ];
 

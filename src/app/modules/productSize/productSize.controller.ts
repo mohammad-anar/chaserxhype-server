@@ -28,7 +28,7 @@ const getAllProductSizes = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getAllProductSizesByProductId = catchAsync(async (req: Request, res: Response) => {
-  const { productId } = req.params;
+  const productId = req.params.productId as string;
   const result = await ProductSizeServices.getAllProductSizes(productId);
 
   sendResponse(res, {

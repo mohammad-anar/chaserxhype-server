@@ -28,7 +28,7 @@ const getAllProductMilks = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getAllProductMilksByProductId = catchAsync(async (req: Request, res: Response) => {
-  const { productId } = req.params;
+  const productId = req.params.productId as string;
   const result = await ProductMilkServices.getAllProductMilks(productId);
 
   sendResponse(res, {

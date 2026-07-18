@@ -28,7 +28,7 @@ const getAllProductExtras = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getAllProductExtrasByProductId = catchAsync(async (req: Request, res: Response) => {
-  const { productId } = req.params;
+  const productId = req.params.productId as string;
   const result = await ProductExtraServices.getAllProductExtras(productId);
 
   sendResponse(res, {
