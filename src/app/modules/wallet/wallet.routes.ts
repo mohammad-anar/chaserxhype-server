@@ -20,7 +20,7 @@ router.get(
 
 router.post(
   "/add-funds",
-  auth("USER"),
+  auth("ADMIN"),
   validateRequest(WalletValidation.addFundsZodSchema),
   WalletController.addFunds
 );

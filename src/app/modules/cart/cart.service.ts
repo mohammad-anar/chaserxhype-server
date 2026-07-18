@@ -3,45 +3,13 @@ import ApiError from "../../../errors/ApiError.js";
 import { StatusCodes } from "http-status-codes";
 import { IAddCartItemPayload, IUpdateCartItemPayload } from "./cart.interface.js";
 
-// Helper to compute user's current coin balance
+// Helper to compute user's current coin balance from their wallet
 const getUserCoins = async (userId: string): Promise<number> => {
-  // Earned from reward payments (completed/paid)
-  const rewardEarned = await prisma.rewardPayment.aggregate({
-    where: {
-      userId,
-      status: "PAID",
-    },
-    _sum: {
-      coin: true,
-    },
+  const wallet = await prisma.wallet.findFirst({
+    where: { userId },
   });
 
-  // Earned from orders
-  const orderEarned = await prisma.order.aggregate({
-    where: {
-      userId,
-      paymentStatus: "PAID",
-    },
-    _sum: {
-      earnedCoin: true,
-    },
-  });
-
-  // Used in orders
-  const orderUsed = await prisma.order.aggregate({
-    where: {
-      userId,
-      paymentStatus: "PAID",
-    },
-    _sum: {
-      usedCoin: true,
-    },
-  });
-
-  const totalEarned = (rewardEarned._sum.coin || 0) + (orderEarned._sum.earnedCoin || 0);
-  const totalUsed = orderUsed._sum.usedCoin || 0;
-
-  return totalEarned - totalUsed;
+  return wallet ? Number(wallet.balance) : 0;
 };
 
 // Recalculates all cart totals and updates the Cart record
