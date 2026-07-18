@@ -27,6 +27,18 @@ const getAllProductSizes = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getAllProductSizesByProductId = catchAsync(async (req: Request, res: Response) => {
+  const { productId } = req.params;
+  const result = await ProductSizeServices.getAllProductSizes(productId);
+
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: "Product sizes retrieved successfully",
+    data: result,
+  });
+});
+
 const getProductSizeById = catchAsync(async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const result = await ProductSizeServices.getProductSizeById(id);
@@ -66,6 +78,7 @@ const deleteProductSize = catchAsync(async (req: Request, res: Response) => {
 export const ProductSizeController = {
   createProductSize,
   getAllProductSizes,
+  getAllProductSizesByProductId,
   getProductSizeById,
   updateProductSize,
   deleteProductSize,

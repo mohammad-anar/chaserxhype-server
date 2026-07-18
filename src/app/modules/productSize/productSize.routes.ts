@@ -19,6 +19,11 @@ router.get(
 );
 
 router.get(
+  "/product/:productId",
+  ProductSizeController.getAllProductSizesByProductId
+);
+
+router.get(
   "/:id",
   ProductSizeController.getProductSizeById
 );

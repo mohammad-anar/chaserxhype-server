@@ -19,6 +19,11 @@ router.get(
 );
 
 router.get(
+  "/product/:productId",
+  ProductExtraController.getAllProductExtrasByProductId
+);
+
+router.get(
   "/:id",
   ProductExtraController.getProductExtraById
 );

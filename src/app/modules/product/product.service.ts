@@ -16,6 +16,7 @@ const createProduct = async (payload: ICreateProductPayload) => {
     const product = await tx.product.create({
       data: {
         ...productData,
+        name,
         slug,
       },
     });
@@ -210,6 +211,7 @@ const updateProduct = async (id: string, payload: IUpdateProductPayload) => {
   const updatedData: Prisma.ProductUpdateInput = { ...productData };
 
   if (name) {
+    updatedData.name = name;
     updatedData.slug = slugify(name, { lower: true, strict: true }) + "-" + Date.now();
   }
 

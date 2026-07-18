@@ -27,6 +27,18 @@ const getAllProductMilks = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getAllProductMilksByProductId = catchAsync(async (req: Request, res: Response) => {
+  const { productId } = req.params;
+  const result = await ProductMilkServices.getAllProductMilks(productId);
+
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: "Product milks retrieved successfully",
+    data: result,
+  });
+});
+
 const getProductMilkById = catchAsync(async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const result = await ProductMilkServices.getProductMilkById(id);
@@ -66,6 +78,7 @@ const deleteProductMilk = catchAsync(async (req: Request, res: Response) => {
 export const ProductMilkController = {
   createProductMilk,
   getAllProductMilks,
+  getAllProductMilksByProductId,
   getProductMilkById,
   updateProductMilk,
   deleteProductMilk,
