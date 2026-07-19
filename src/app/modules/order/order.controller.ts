@@ -72,10 +72,23 @@ const updateOrderStatus = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const refundOrder = catchAsync(async (req: Request, res: Response) => {
+  const orderId = req.params.orderId as string;
+  const result = await OrderServices.refundOrder(orderId);
+
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: "Order refunded successfully",
+    data: result,
+  });
+});
+
 export const OrderController = {
   checkout,
   getMyOrders,
   getOrderById,
   getAllOrders,
   updateOrderStatus,
+  refundOrder,
 };

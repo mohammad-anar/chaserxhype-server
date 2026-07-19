@@ -37,4 +37,10 @@ router.patch(
   OrderController.updateOrderStatus
 );
 
+router.post(
+  "/refund/:orderId",
+  auth("ADMIN"),
+  OrderController.refundOrder
+);
+
 export const OrderRouter = router;

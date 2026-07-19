@@ -519,10 +519,116 @@ const updateOrderStatus = async (orderId: string, status: OrderStatus) => {
   return result;
 };
 
+const refundOrder = async (orderId: string) => {
+  return await prisma.$transaction(async (tx) => {
+    // 1. Fetch order with payments and reward payments
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      include: {
+        payments: true,
+        rewardPayments: true,
+      },
+    });
+
+    if (!order) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Order not found");
+    }
+
+    if (order.paymentStatus !== "PAID") {
+      throw new ApiError(StatusCodes.BAD_REQUEST, `Cannot refund order with payment status: ${order.paymentStatus}`);
+    }
+
+    // 2. Perform Stripe Refunds for any paid standard Payment records
+    for (const payment of order.payments) {
+      if (payment.status === "PAID" && payment.transactionId) {
+        if (payment.transactionId.startsWith("pi_")) {
+          try {
+            await stripe.refunds.create({
+              payment_intent: payment.transactionId,
+            });
+          } catch (err: any) {
+            console.error(`Stripe refund failed for transaction ${payment.transactionId}:`, err.message);
+          }
+        }
+
+        // Update payment status in db
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: "REFUNDED" },
+        });
+      }
+    }
+
+    // 3. Handle Reward Coins refund and deduction
+    let wallet = await tx.wallet.findFirst({ where: { userId: order.userId } });
+    if (!wallet) {
+      wallet = await tx.wallet.create({
+        data: { userId: order.userId, balance: 0 },
+      });
+    }
+
+    if (order.paymentMethod === "REWARD_COINS") {
+      // If paid with coins, refund the coins back to the user
+      const refundCoins = Number(order.usedCoin || 0);
+      await tx.wallet.update({
+        where: { id: wallet.id },
+        data: {
+          balance: {
+            increment: refundCoins,
+          },
+        },
+      });
+
+      // Update RewardPayment statuses to REFUNDED
+      await tx.rewardPayment.updateMany({
+        where: { orderId: order.id, status: "PAID" },
+        data: { status: "REFUNDED" },
+      });
+    } else {
+      // If paid with Money, deduct the earned coins to prevent abuse
+      const earnedCoins = Number(order.earnedCoin || 0);
+      if (earnedCoins > 0) {
+        const newBalance = Math.max(0, Number(wallet.balance) - earnedCoins);
+        await tx.wallet.update({
+          where: { id: wallet.id },
+          data: { balance: newBalance },
+        });
+      }
+    }
+
+    // 4. Update Order statuses to REFUNDED
+    const result = await tx.order.update({
+      where: { id: order.id },
+      data: {
+        status: "REFUNDED",
+        paymentStatus: "REFUNDED",
+      },
+      include: {
+        orderItems: {
+          include: {
+            orderItemExtras: {
+              include: {
+                productExtra: true,
+              },
+            },
+            product: true,
+            coinProduct: true,
+          },
+        },
+        payments: true,
+        rewardPayments: true,
+      },
+    });
+
+    return result;
+  });
+};
+
 export const OrderServices = {
   checkout,
   getMyOrders,
   getOrderById,
   getAllOrders,
   updateOrderStatus,
+  refundOrder,
 };
