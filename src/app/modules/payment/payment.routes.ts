@@ -5,9 +5,8 @@ import auth from "../../middlewares/auth.js";
 const router = express.Router();
 
 router.post(
-  "/confirm-payment",
-  auth("USER", "ADMIN"),
-  PaymentController.confirmPayment
+  "/webhook",
+  PaymentController.stripeWebhook
 );
 
 router.get(

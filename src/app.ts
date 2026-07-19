@@ -2,6 +2,7 @@ import cors from "cors";
 import express, { Application, Request, Response } from "express";
 import config from "./config/index.js";
 import router from "./app/routes/index.js";
+import { PaymentController } from "./app/modules/payment/payment.controller.js";
 import globalErrorHandler from "./app/middlewares/globalErrorHandler.js";
 import notFound from "./app/middlewares/notFound.js";
 
@@ -14,11 +15,18 @@ app.use(
 );
 
 //parser
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req: any, res: any, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
 app.use(express.urlencoded({ extended: true }));
 
 app.use(express.static("uploads"));
 
+app.post("/api/webhooks/stripe", PaymentController.stripeWebhook);
 app.use("/api/v1", router);
 
 app.get("/", (req: Request, res: Response) => {
