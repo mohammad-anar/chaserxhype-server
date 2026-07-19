@@ -48,8 +48,8 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
     // 2. Create the Order record
     // If it's a coin product, the payment is processed immediately inside this transaction.
     // If it's a normal product, the payment starts as PENDING until Stripe checkout completes.
-    const initialStatus = isCoinProduct ? "CONFIRMED" : "PENDING";
-    const initialPaymentStatus = isCoinProduct ? "PAID" : "PENDING";
+    const initialStatus = (isCoinProduct && totalAmount <= 0) ? "CONFIRMED" : "PENDING";
+    const initialPaymentStatus = (isCoinProduct && totalAmount <= 0) ? "PAID" : "PENDING";
 
     const order = await tx.order.create({
       data: {
@@ -140,6 +140,96 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
           paidAt: new Date(),
         },
       });
+
+      // If totalAmount > 0, generate Stripe session for delivery fee/service charge
+      if (totalAmount > 0) {
+        const frontendUrl = config.frontend_url || "http://localhost:3000";
+        const feeLineItems = [];
+
+        if (Number(cart.deliveryFee || 0) > 0) {
+          feeLineItems.push({
+            price_data: {
+              currency: "usd",
+              product_data: {
+                name: "Delivery Fee",
+                description: `Delivery fee for Order #${orderNumber}`,
+              },
+              unit_amount: Math.round(Number(cart.deliveryFee) * 100),
+            },
+            quantity: 1,
+          });
+        }
+
+        if (Number(cart.serviceCharge || 0) > 0) {
+          feeLineItems.push({
+            price_data: {
+              currency: "usd",
+              product_data: {
+                name: "Service Charge",
+                description: `Service charge for Order #${orderNumber}`,
+              },
+              unit_amount: Math.round(Number(cart.serviceCharge) * 100),
+            },
+            quantity: 1,
+          });
+        }
+
+        if (Number(cart.taxAmount || 0) > 0) {
+          feeLineItems.push({
+            price_data: {
+              currency: "usd",
+              product_data: {
+                name: "Tax",
+                description: `Tax amount for Order #${orderNumber}`,
+              },
+              unit_amount: Math.round(Number(cart.taxAmount) * 100),
+            },
+            quantity: 1,
+          });
+        }
+
+        if (feeLineItems.length === 0) {
+          feeLineItems.push({
+            price_data: {
+              currency: "usd",
+              product_data: {
+                name: `Order Fee #${orderNumber}`,
+                description: `Payment for Order #${orderNumber} fees`,
+              },
+              unit_amount: Math.round(totalAmount * 100),
+            },
+            quantity: 1,
+          });
+        }
+
+        const session = await stripe.checkout.sessions.create({
+          line_items: feeLineItems,
+          mode: "payment",
+          success_url: `${frontendUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}&order_id=${order.id}`,
+          cancel_url: `${frontendUrl}/payment/cancel?order_id=${order.id}`,
+          metadata: {
+            orderId: order.id,
+            userId: userId,
+            totalEarnedCoin: "0",
+          },
+        });
+
+        paymentUrl = session.url;
+
+        // Create pending Payment record for the monetary fees
+        await tx.payment.create({
+          data: {
+            orderId: order.id,
+            userId,
+            paymentMethod: payload.payType || "CARD",
+            status: "PENDING",
+            amount: totalAmount,
+            currency: "USD",
+            transactionId: `TXN-PENDING-${Date.now()}-${Math.floor(100000 + Math.random() * 900000)}`,
+            gatewayPaymentId: session.id,
+          },
+        });
+      }
     } else {
       // Money payment flow using Stripe Checkout Session
       const frontendUrl = config.frontend_url || "http://localhost:3000";
