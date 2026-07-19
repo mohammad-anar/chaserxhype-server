@@ -34,6 +34,7 @@ router.get(
 router.patch(
   "/status/:orderId",
   auth("ADMIN"),
+  validateRequest(OrderValidation.updateOrderStatusZodSchema),
   OrderController.updateOrderStatus
 );
 
