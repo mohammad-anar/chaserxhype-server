@@ -7,9 +7,18 @@ import globalErrorHandler from "./app/middlewares/globalErrorHandler.js";
 import notFound from "./app/middlewares/notFound.js";
 
 const app: Application = express();
+const allowedOrigins = (config.cors_origin ?? "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 app.use(
   cors({
-    origin: ["http://localhost:3000", "http://10.10.7.102:3000"],
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      callback(new Error(`CORS: origin '${origin}' is not allowed`));
+    },
     credentials: true,
   }),
 );
