@@ -28,3 +28,8 @@ export type IChangePasswordPayload = {
   oldPassword?: string;
   newPassword?: string;
 };
+
+export type IRefreshTokenPayload = {
+  refreshToken?: string;
+};
+

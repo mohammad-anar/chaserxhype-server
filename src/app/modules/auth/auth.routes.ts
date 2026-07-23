@@ -56,4 +56,19 @@ router.post(
   AuthController.changePassword
 );
 
+// Refresh Access Token
+router.post(
+  "/refresh-token",
+  validateRequest(AuthValidation.refreshTokenZodSchema),
+  AuthController.refreshToken
+);
+
+// Alias for access-token route
+router.post(
+  "/access-token",
+  validateRequest(AuthValidation.refreshTokenZodSchema),
+  AuthController.refreshToken
+);
+
 export const AuthRoutes = router;
+

@@ -92,6 +92,18 @@ const resendOtp = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const refreshToken = catchAsync(async (req: Request, res: Response) => {
+  const token = req.cookies?.refreshToken || req.body?.refreshToken || req.headers.authorization?.replace("Bearer ", "");
+  const result = await AuthService.refreshToken(token);
+
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: "Token refreshed successfully.",
+    data: result,
+  });
+});
+
 export const AuthController = {
   verifyEmail,
   loginUser,
@@ -100,4 +112,6 @@ export const AuthController = {
   verifyOtp,
   resetPassword,
   resendOtp,
+  refreshToken,
 };
+

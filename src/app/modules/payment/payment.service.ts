@@ -183,7 +183,20 @@ const getMyRewardPayments = async (userId: string, options: any) => {
       [sortBy]: sortOrder,
     },
     include: {
-      order: true,
+      order: {
+        include: {
+          orderItems: {
+            include: {
+              coinProduct: {
+                include: {
+                  product: true,
+                },
+              },
+              product: true,
+            },
+          },
+        },
+      },
     },
   });
 

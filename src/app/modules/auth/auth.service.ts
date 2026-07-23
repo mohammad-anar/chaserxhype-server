@@ -14,6 +14,7 @@ import {
   IResendOtpPayload,
   ILoginPayload,
   IChangePasswordPayload,
+  IRefreshTokenPayload,
 } from "./auth.interface.js";
 import { Secret } from "jsonwebtoken";
 import { UserStatus } from "@prisma/client";
@@ -326,6 +327,54 @@ const resendOtp = async (payload: IResendOtpPayload) => {
   return { message: "OTP code resent successfully" };
 };
 
+const refreshToken = async (token: string) => {
+  if (!token) {
+    throw new ApiError(StatusCodes.UNAUTHORIZED, "Refresh token is required");
+  }
+
+  let decoded: any;
+  try {
+    decoded = jwtHelper.verifyToken(token, JWT_SECRET);
+  } catch (error) {
+    throw new ApiError(StatusCodes.UNAUTHORIZED, "Invalid or expired refresh token");
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: decoded.id || decoded.userId },
+  });
+
+  if (!user || user.isDeleted) {
+    throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
+  }
+
+  if (user.status === UserStatus.BLOCKED || user.status === UserStatus.SUSPENDED) {
+    throw new ApiError(StatusCodes.FORBIDDEN, `Your account status is ${user.status.toLowerCase()}`);
+  }
+
+  const tokenPayload = {
+    id: user.id,
+    email: user.email,
+    role: user.role,
+  };
+
+  const newAccessToken = jwtHelper.createToken(
+    tokenPayload,
+    JWT_SECRET,
+    (config.jwt.jwt_expire_in || "1d") as any,
+  );
+
+  const newRefreshToken = jwtHelper.createToken(
+    tokenPayload,
+    JWT_SECRET,
+    (config.jwt.jwt_refresh_expire_in || "30d") as any,
+  );
+
+  return {
+    accessToken: newAccessToken,
+    refreshToken: newRefreshToken,
+  };
+};
+
 export const AuthService = {
   verifyEmail,
   loginUser,
@@ -334,4 +383,6 @@ export const AuthService = {
   verifyOtp,
   resetPassword,
   resendOtp,
+  refreshToken,
 };
+

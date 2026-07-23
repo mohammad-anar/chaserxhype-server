@@ -51,6 +51,13 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
     const initialStatus = (isCoinProduct && totalAmount <= 0) ? "CONFIRMED" : "PENDING";
     const initialPaymentStatus = (isCoinProduct && totalAmount <= 0) ? "PAID" : "PENDING";
 
+    let finalNote = payload.note || "";
+    if (payload.shippingAddress) {
+      const sa = payload.shippingAddress;
+      const addrStr = `Shipping: ${sa.street1}, ${sa.city}, ${sa.state ? `${sa.state}, ` : ""}${sa.country}`;
+      finalNote = finalNote ? `${finalNote} | ${addrStr}` : addrStr;
+    }
+
     const order = await tx.order.create({
       data: {
         orderNumber,
@@ -67,9 +74,24 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
         earnedCoin: isCoinProduct ? 0 : totalEarnedCoin,
         usedCoin: isCoinProduct ? cart.totalCoin : 0,
         total: cart.total,
-        note: payload.note,
+        note: finalNote,
       },
     });
+
+    if (payload.shippingAddress) {
+      await tx.shippingAddress.create({
+        data: {
+          orderId: order.id,
+          fullName: (payload.shippingAddress as any)?.fullName || null,
+          street1: payload.shippingAddress.street1,
+          state: payload.shippingAddress.state || null,
+          city: payload.shippingAddress.city,
+          country: payload.shippingAddress.country,
+          postalCode: (payload.shippingAddress as any)?.postalCode || null,
+          phone: (payload.shippingAddress as any)?.phone || null,
+        },
+      });
+    }
 
     // 3. Create OrderItems and OrderItemExtras
     for (const item of cart.cartItems) {
@@ -137,9 +159,13 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
           transactionId: `TXN-REWARD-${Date.now()}-${Math.floor(100000 + Math.random() * 900000)}`,
           status: "PAID",
           coin: totalCoinCost,
+          total: totalAmount,
           paidAt: new Date(),
         },
       });
+
+      // Generate transactionId
+      const transactionId = `TXN-PENDING-${Date.now()}-${Math.floor(100000 + Math.random() * 900000)}`;
 
       // If totalAmount > 0, generate Stripe session for delivery fee/service charge
       if (totalAmount > 0) {
@@ -205,8 +231,8 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
         const session = await stripe.checkout.sessions.create({
           line_items: feeLineItems,
           mode: "payment",
-          success_url: `${frontendUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}&order_id=${order.id}`,
-          cancel_url: `${frontendUrl}/payment/cancel?order_id=${order.id}`,
+          success_url: `${frontendUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}&order_number=${order.orderNumber}&transaction_id=${transactionId}`,
+          cancel_url: `${frontendUrl}/payment/cancel?order_number=${order.orderNumber}&transaction_id=${transactionId}`,
           metadata: {
             orderId: order.id,
             userId: userId,
@@ -225,7 +251,7 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
             status: "PENDING",
             amount: totalAmount,
             currency: "USD",
-            transactionId: `TXN-PENDING-${Date.now()}-${Math.floor(100000 + Math.random() * 900000)}`,
+            transactionId,
             gatewayPaymentId: session.id,
           },
         });
@@ -233,7 +259,8 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
     } else {
       // Money payment flow using Stripe Checkout Session
       const frontendUrl = config.frontend_url || "http://localhost:3000";
-      
+      const transactionId = `TXN-PENDING-${Date.now()}-${Math.floor(100000 + Math.random() * 900000)}`;
+
       const lineItems = cart.cartItems.map((item) => {
         const itemTotalPrice = Number(item.totalPrice || 0);
         const unitAmount = Math.round((itemTotalPrice / item.quantity) * 100);
@@ -295,8 +322,8 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
       const session = await stripe.checkout.sessions.create({
         line_items: lineItems,
         mode: "payment",
-        success_url: `${frontendUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}&order_id=${order.id}`,
-        cancel_url: `${frontendUrl}/payment/cancel?order_id=${order.id}`,
+        success_url: `${frontendUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}&order_number=${order.orderNumber}&transaction_id=${transactionId}`,
+        cancel_url: `${frontendUrl}/payment/cancel?order_number=${order.orderNumber}&transaction_id=${transactionId}`,
         metadata: {
           orderId: order.id,
           userId: userId,
@@ -315,7 +342,7 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
           status: "PENDING",
           amount: totalAmount,
           currency: "USD",
-          transactionId: `TXN-PENDING-${Date.now()}-${Math.floor(100000 + Math.random() * 900000)}`,
+          transactionId,
           gatewayPaymentId: session.id,
         },
       });
@@ -359,6 +386,7 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
         },
         payments: true,
         rewardPayments: true,
+        shippingAddress: true,
       },
     });
 
@@ -394,6 +422,7 @@ const getMyOrders = async (userId: string, options: any) => {
       },
       payments: true,
       rewardPayments: true,
+      shippingAddress: true,
     },
   });
 
@@ -410,12 +439,13 @@ const getMyOrders = async (userId: string, options: any) => {
 };
 
 const getOrderById = async (userId: string, role: string, orderId: string) => {
-  const whereClause: any = { id: orderId };
+  const isId = !orderId.startsWith("ORD-");
+  const whereClause: any = isId ? { id: orderId } : { orderNumber: orderId };
   if (role !== "ADMIN") {
     whereClause.userId = userId;
   }
 
-  const result = await prisma.order.findUnique({
+  const result = await prisma.order.findFirst({
     where: whereClause,
     include: {
       orderItems: {
@@ -431,6 +461,7 @@ const getOrderById = async (userId: string, role: string, orderId: string) => {
       },
       payments: true,
       rewardPayments: true,
+      shippingAddress: true,
     },
   });
 
