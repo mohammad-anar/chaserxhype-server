@@ -17,11 +17,20 @@ const createCoinProduct = async (payload: ICreateCoinProductPayload) => {
   const result = await prisma.coinProduct.create({
     data: {
       productId: payload.productId,
-      name: product.slug, // Pull name from product slug
+      name: product.name,
       needPoint: payload.needPoint,
     },
     include: {
-      product: true,
+      product: {
+        include: {
+          category: true,
+        },
+      },
+      _count: {
+        select: {
+          orderItems: true,
+        },
+      },
     },
   });
   return result;
@@ -37,17 +46,16 @@ const getAllCoinProducts = async (filters: ICoinProductFilterableFields, options
 
   if (searchTerm) {
     andConditions.push({
-      name: {
-        contains: searchTerm,
-        mode: "insensitive",
-      },
+      OR: [
+        { name: { contains: searchTerm, mode: "insensitive" } },
+        { product: { name: { contains: searchTerm, mode: "insensitive" } } },
+      ],
     });
   }
 
   const whereConditions: Prisma.CoinProductWhereInput =
     andConditions.length > 0 ? { AND: andConditions } : {};
 
-  // Custom sort mapper (e.g. created_at -> createdAt)
   let orderConfig: any = {};
   if (sortBy.toLowerCase() === "createdat" || sortBy.toLowerCase() === "created_at") {
     orderConfig = { createdAt: sortOrder };
@@ -61,7 +69,16 @@ const getAllCoinProducts = async (filters: ICoinProductFilterableFields, options
     take: limit,
     orderBy: orderConfig,
     include: {
-      product: true,
+      product: {
+        include: {
+          category: true,
+        },
+      },
+      _count: {
+        select: {
+          orderItems: true,
+        },
+      },
     },
   });
 
@@ -83,7 +100,16 @@ const getCoinProductById = async (id: string) => {
   const coinProduct = await prisma.coinProduct.findUnique({
     where: { id },
     include: {
-      product: true,
+      product: {
+        include: {
+          category: true,
+        },
+      },
+      _count: {
+        select: {
+          orderItems: true,
+        },
+      },
     },
   });
 
@@ -112,14 +138,23 @@ const updateCoinProduct = async (id: string, payload: IUpdateCoinProductPayload)
     if (!product || product.isDeleted) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Associated product not found");
     }
-    updateData.name = product.slug;
+    updateData.name = product.name;
   }
 
   const result = await prisma.coinProduct.update({
     where: { id },
     data: updateData,
     include: {
-      product: true,
+      product: {
+        include: {
+          category: true,
+        },
+      },
+      _count: {
+        select: {
+          orderItems: true,
+        },
+      },
     },
   });
 

@@ -54,7 +54,7 @@ const createUser = async (payload: ICreateUserPayload) => {
         otpCode,
         otpExpiresAt,
         role: UserRole.USER,
-        status: UserStatus.ACTIVE, // default active but isVerified is false
+        status: UserStatus.ACTIVE,
         isVerified: false,
         profileImage: payload.profileImage || null,
       },
@@ -92,6 +92,10 @@ const createUser = async (payload: ICreateUserPayload) => {
 const getMyProfile = async (userId: string) => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
+    include: {
+      wallets: true,
+      addresses: true,
+    },
   });
 
   if (!user || user.isDeleted) {
@@ -99,7 +103,12 @@ const getMyProfile = async (userId: string) => {
   }
 
   const { password, ...userWithoutPassword } = user;
-  return userWithoutPassword;
+  const stars = user.wallets && user.wallets.length > 0 ? Number(user.wallets[0].balance || 0) : 0;
+
+  return {
+    ...userWithoutPassword,
+    stars,
+  };
 };
 
 const updateMyProfile = async (userId: string, payload: IUpdateUserProfilePayload) => {
@@ -111,7 +120,6 @@ const updateMyProfile = async (userId: string, payload: IUpdateUserProfilePayloa
     throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
   }
 
-  // If updating phone, check for uniqueness
   if (payload.phone && payload.phone !== user.phone) {
     const existingUser = await prisma.user.findUnique({
       where: { phone: payload.phone },
@@ -167,15 +175,50 @@ const getAllUsers = async (filters: IUserFilterableFields, options: any) => {
     orderBy: {
       [sortBy]: sortOrder,
     },
+    include: {
+      wallets: true,
+      addresses: true,
+      orders: {
+        select: {
+          id: true,
+          orderNumber: true,
+          status: true,
+          paymentStatus: true,
+          total: true,
+          createdAt: true,
+        },
+      },
+      _count: {
+        select: {
+          orders: true,
+        },
+      },
+    },
   });
 
   const total = await prisma.user.count({
     where: whereConditions,
   });
 
-  const usersWithoutPasswords = result.map((user) => {
+  const usersFormatted = result.map((user) => {
     const { password, ...userWithoutPassword } = user;
-    return userWithoutPassword;
+    const ordersCount = user._count?.orders ?? user.orders?.length ?? 0;
+    
+    // Sum total spent for completed/paid orders (or all valid non-cancelled orders)
+    const totalSpent = user.orders
+      ? user.orders
+          .filter((o) => o.status !== "CANCELED" && o.status !== "FAILED")
+          .reduce((sum, curr) => sum + Number(curr.total || 0), 0)
+      : 0;
+
+    const stars = user.wallets && user.wallets.length > 0 ? Number(user.wallets[0].balance || 0) : 0;
+
+    return {
+      ...userWithoutPassword,
+      ordersCount,
+      totalSpent,
+      stars,
+    };
   });
 
   return {
@@ -184,13 +227,35 @@ const getAllUsers = async (filters: IUserFilterableFields, options: any) => {
       limit,
       total,
     },
-    data: usersWithoutPasswords,
+    data: usersFormatted,
   };
 };
 
 const getUserById = async (id: string) => {
   const user = await prisma.user.findUnique({
     where: { id },
+    include: {
+      wallets: true,
+      addresses: true,
+      orders: {
+        select: {
+          id: true,
+          orderNumber: true,
+          status: true,
+          paymentStatus: true,
+          total: true,
+          createdAt: true,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      },
+      _count: {
+        select: {
+          orders: true,
+        },
+      },
+    },
   });
 
   if (!user || user.isDeleted) {
@@ -198,7 +263,21 @@ const getUserById = async (id: string) => {
   }
 
   const { password, ...userWithoutPassword } = user;
-  return userWithoutPassword;
+  const ordersCount = user._count?.orders ?? user.orders?.length ?? 0;
+  const totalSpent = user.orders
+    ? user.orders
+        .filter((o) => o.status !== "CANCELED" && o.status !== "FAILED")
+        .reduce((sum, curr) => sum + Number(curr.total || 0), 0)
+    : 0;
+
+  const stars = user.wallets && user.wallets.length > 0 ? Number(user.wallets[0].balance || 0) : 0;
+
+  return {
+    ...userWithoutPassword,
+    ordersCount,
+    totalSpent,
+    stars,
+  };
 };
 
 const updateUserStatus = async (id: string, status: UserStatus) => {

@@ -1,5 +1,30 @@
 import { z } from "zod";
 
+const preprocessArray = (val: unknown) => {
+  if (typeof val === "string") {
+    try {
+      return JSON.parse(val);
+    } catch {
+      return val;
+    }
+  }
+  return val;
+};
+
+const preprocessNumber = (val: unknown) => {
+  if (typeof val === "string" && val.trim() !== "") {
+    const num = Number(val);
+    return isNaN(num) ? val : num;
+  }
+  return val;
+};
+
+const preprocessBoolean = (val: unknown) => {
+  if (val === "true") return true;
+  if (val === "false") return false;
+  return val;
+};
+
 const createProductZodSchema = z.object({
   name: z.string({
     message: "Product name is required",
@@ -13,45 +38,62 @@ const createProductZodSchema = z.object({
   description: z.string({
     message: "Description is required",
   }),
-  basePrice: z.number({
-    message: "Base price is required and must be a number",
-  }),
-  coin: z.number({
-    message: "Coin value is required and must be a number",
-  }),
-  customOption: z.boolean().optional(),
-  image: z.array(z.string()).optional(),
-  productSize: z
-    .array(
+  basePrice: z.preprocess(
+    preprocessNumber,
+    z.number({ message: "Base price is required and must be a number" })
+  ),
+  coin: z.preprocess(
+    preprocessNumber,
+    z.number({ message: "Coin value is required and must be a number" })
+  ),
+  customOption: z.preprocess(preprocessBoolean, z.boolean().optional()),
+  image: z.preprocess(preprocessArray, z.array(z.string()).optional()),
+  productSize: z.preprocess(
+    preprocessArray,
+    z.array(
       z.object({
+        id: z.string().optional(),
         name: z.string({ message: "Size name is required" }),
         oz: z.string({ message: "Ounces is required" }),
-        priceAdjustment: z.number({ message: "Price adjustment must be a number" }),
+        priceAdjustment: z.preprocess(
+          preprocessNumber,
+          z.number({ message: "Price adjustment must be a number" })
+        ),
         adjustmentType: z.enum(["ADD", "SUBTRACT"], {
           message: "Adjustment type must be ADD or SUBTRACT",
         }),
       })
-    )
-    .optional(),
-  productMilk: z
-    .array(
+    ).optional()
+  ),
+  productMilk: z.preprocess(
+    preprocessArray,
+    z.array(
       z.object({
+        id: z.string().optional(),
         name: z.string({ message: "Milk name is required" }),
-        priceAdjustment: z.number({ message: "Price adjustment must be a number" }),
+        priceAdjustment: z.preprocess(
+          preprocessNumber,
+          z.number({ message: "Price adjustment must be a number" })
+        ),
         adjustmentType: z.enum(["ADD", "SUBTRACT"], {
           message: "Adjustment type must be ADD or SUBTRACT",
         }),
       })
-    )
-    .optional(),
-  productExtra: z
-    .array(
+    ).optional()
+  ),
+  productExtra: z.preprocess(
+    preprocessArray,
+    z.array(
       z.object({
+        id: z.string().optional(),
         name: z.string({ message: "Extra name is required" }),
-        price: z.number({ message: "Price must be a number" }),
+        price: z.preprocess(
+          preprocessNumber,
+          z.number({ message: "Price must be a number" })
+        ),
       })
-    )
-    .optional(),
+    ).optional()
+  ),
 });
 
 const updateProductZodSchema = z.object({
@@ -59,40 +101,43 @@ const updateProductZodSchema = z.object({
   categoryId: z.string().optional(),
   shortDescription: z.string().optional(),
   description: z.string().optional(),
-  basePrice: z.number().optional(),
-  coin: z.number().optional(),
-  customOption: z.boolean().optional(),
-  image: z.array(z.string()).optional(),
-  productSize: z
-    .array(
+  basePrice: z.preprocess(preprocessNumber, z.number().optional()),
+  coin: z.preprocess(preprocessNumber, z.number().optional()),
+  customOption: z.preprocess(preprocessBoolean, z.boolean().optional()),
+  image: z.preprocess(preprocessArray, z.array(z.string()).optional()),
+  productSize: z.preprocess(
+    preprocessArray,
+    z.array(
       z.object({
-        id: z.string({ message: "ProductSize record ID is required for update" }),
+        id: z.string().optional(),
         name: z.string().optional(),
         oz: z.string().optional(),
-        priceAdjustment: z.number().optional(),
+        priceAdjustment: z.preprocess(preprocessNumber, z.number().optional()),
         adjustmentType: z.enum(["ADD", "SUBTRACT"]).optional(),
       })
-    )
-    .optional(),
-  productMilk: z
-    .array(
+    ).optional()
+  ),
+  productMilk: z.preprocess(
+    preprocessArray,
+    z.array(
       z.object({
-        id: z.string({ message: "ProductMilk record ID is required for update" }),
+        id: z.string().optional(),
         name: z.string().optional(),
-        priceAdjustment: z.number().optional(),
+        priceAdjustment: z.preprocess(preprocessNumber, z.number().optional()),
         adjustmentType: z.enum(["ADD", "SUBTRACT"]).optional(),
       })
-    )
-    .optional(),
-  productExtra: z
-    .array(
+    ).optional()
+  ),
+  productExtra: z.preprocess(
+    preprocessArray,
+    z.array(
       z.object({
-        id: z.string({ message: "ProductExtra record ID is required for update" }),
+        id: z.string().optional(),
         name: z.string().optional(),
-        price: z.number().optional(),
+        price: z.preprocess(preprocessNumber, z.number().optional()),
       })
-    )
-    .optional(),
+    ).optional()
+  ),
 });
 
 export const ProductValidation = {

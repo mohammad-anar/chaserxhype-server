@@ -10,10 +10,9 @@
   },
   "scripts": {
     "dev": "tsx watch ./src/server.ts",
-    "start": "tsx ./src/server.ts",
     "build": "tsc",
-    "postinstall": "prisma generate",
-    "start:prod": "node dist/server.js"
+    "start": "node ./dist/server.js",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.1.0",

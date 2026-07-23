@@ -47,7 +47,7 @@ const getOrderById = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getAllOrders = catchAsync(async (req: Request, res: Response) => {
-  const options = pick(req.query, ["page", "limit", "sortBy", "sortOrder"]);
+  const options = pick(req.query, ["page", "limit", "sortBy", "sortOrder", "status", "searchTerm"]);
   const result = await OrderServices.getAllOrders(options);
 
   sendResponse(res, {

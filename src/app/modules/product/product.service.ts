@@ -6,6 +6,23 @@ import { paginationHelper } from "../../../helpers/paginationHelper.js";
 import { Prisma } from "@prisma/client";
 import { ICreateProductPayload, IProductFilterableFields, IUpdateProductPayload } from "./product.interface.js";
 
+const productInclude = {
+  productSizes: true,
+  productMilks: true,
+  productExtras: true,
+  category: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+  _count: {
+    select: {
+      orderItems: true,
+    },
+  },
+};
+
 const createProduct = async (payload: ICreateProductPayload) => {
   const { productSize, productMilk, productExtra, name, ...productData } = payload;
 
@@ -63,16 +80,7 @@ const createProduct = async (payload: ICreateProductPayload) => {
   // Return product with associations
   const finalProduct = await prisma.product.findUnique({
     where: { id: result.id },
-    include: {
-      productSizes: true,
-      productMilks: true,
-      productExtras: true,
-      category: {
-        select: {
-          name: true,
-        },
-      },
-    },
+    include: productInclude,
   });
 
   return finalProduct;
@@ -90,6 +98,7 @@ const getAllProducts = async (filters: IProductFilterableFields, options: any) =
   if (searchTerm) {
     andConditions.push({
       OR: [
+        { name: { contains: searchTerm, mode: "insensitive" } },
         { slug: { contains: searchTerm, mode: "insensitive" } },
         { shortDescription: { contains: searchTerm, mode: "insensitive" } },
         { description: { contains: searchTerm, mode: "insensitive" } },
@@ -134,9 +143,11 @@ const getAllProducts = async (filters: IProductFilterableFields, options: any) =
   const whereConditions: Prisma.ProductWhereInput =
     andConditions.length > 0 ? { AND: andConditions } : {};
 
-  // Custom sort mapper (e.g. created_at -> createdAt)
+  // Custom sort mapper
   let orderConfig: any = {};
-  if (sortBy.toLowerCase() === "createdat" || sortBy.toLowerCase() === "created_at") {
+  if (sortBy === "popular" || sortBy === "orderCount" || sortBy === "ordersCount" || !sortBy) {
+    orderConfig = { orderItems: { _count: sortOrder || "desc" } };
+  } else if (sortBy.toLowerCase() === "createdat" || sortBy.toLowerCase() === "created_at") {
     orderConfig = { createdAt: sortOrder };
   } else if (sortBy === "price" || sortBy === "basePrice") {
     orderConfig = { basePrice: sortOrder };
@@ -149,16 +160,7 @@ const getAllProducts = async (filters: IProductFilterableFields, options: any) =
     skip,
     take: limit,
     orderBy: orderConfig,
-    include: {
-      productSizes: true,
-      productMilks: true,
-      productExtras: true,
-      category: {
-        select: {
-          name: true,
-        },
-      },
-    },
+    include: productInclude,
   });
 
   const total = await prisma.product.count({
@@ -178,16 +180,7 @@ const getAllProducts = async (filters: IProductFilterableFields, options: any) =
 const getProductById = async (id: string) => {
   const product = await prisma.product.findUnique({
     where: { id },
-    include: {
-      productSizes: true,
-      productMilks: true,
-      productExtras: true,
-      category: {
-        select: {
-          name: true,
-        },
-      },
-    },
+    include: productInclude,
   });
 
   if (!product || product.isDeleted) {
@@ -222,72 +215,117 @@ const updateProduct = async (id: string, payload: IUpdateProductPayload) => {
       data: updatedData,
     });
 
-    // Update sizes in-place if provided (only update by ID, cannot delete/recreate)
-    if (productSize !== undefined && productSize.length > 0) {
+    // Update, create or remove product sizes
+    if (productSize !== undefined) {
+      const existingSizes = await tx.productSize.findMany({
+        where: { productId: id },
+        select: { id: true },
+      });
+      const keepIds = productSize.map((s) => s.id).filter((id): id is string => Boolean(id));
+      const deletedIds = existingSizes.filter((s) => !keepIds.includes(s.id)).map((s) => s.id);
+
+      if (deletedIds.length > 0) {
+        await tx.productSize.deleteMany({
+          where: { id: { in: deletedIds } },
+        });
+      }
+
       for (const item of productSize) {
-        const sizeRecord = await tx.productSize.findFirst({
-          where: { id: item.id, productId: id },
-        });
-        if (!sizeRecord) {
-          throw new ApiError(
-            StatusCodes.NOT_FOUND,
-            `ProductSize record with ID ${item.id} not found for this product`
-          );
+        if (item.id) {
+          await tx.productSize.update({
+            where: { id: item.id },
+            data: {
+              ...(item.name && { name: item.name }),
+              ...(item.oz && { oz: item.oz }),
+              ...(item.priceAdjustment !== undefined && { priceAdjustment: item.priceAdjustment }),
+              ...(item.adjustmentType && { adjustmentType: item.adjustmentType }),
+            },
+          });
+        } else {
+          await tx.productSize.create({
+            data: {
+              productId: id,
+              name: item.name || "Regular",
+              oz: item.oz || "12oz",
+              priceAdjustment: item.priceAdjustment ?? 0,
+              adjustmentType: item.adjustmentType || "ADD",
+            },
+          });
         }
-        await tx.productSize.update({
-          where: { id: item.id },
-          data: {
-            name: item.name,
-            oz: item.oz,
-            priceAdjustment: item.priceAdjustment,
-            adjustmentType: item.adjustmentType,
-          },
-        });
       }
     }
 
-    // Update milks in-place if provided
-    if (productMilk !== undefined && productMilk.length > 0) {
+    // Update, create or remove product milks
+    if (productMilk !== undefined) {
+      const existingMilks = await tx.productMilk.findMany({
+        where: { productId: id },
+        select: { id: true },
+      });
+      const keepIds = productMilk.map((m) => m.id).filter((id): id is string => Boolean(id));
+      const deletedIds = existingMilks.filter((m) => !keepIds.includes(m.id)).map((m) => m.id);
+
+      if (deletedIds.length > 0) {
+        await tx.productMilk.deleteMany({
+          where: { id: { in: deletedIds } },
+        });
+      }
+
       for (const item of productMilk) {
-        const milkRecord = await tx.productMilk.findFirst({
-          where: { id: item.id, productId: id },
-        });
-        if (!milkRecord) {
-          throw new ApiError(
-            StatusCodes.NOT_FOUND,
-            `ProductMilk record with ID ${item.id} not found for this product`
-          );
+        if (item.id) {
+          await tx.productMilk.update({
+            where: { id: item.id },
+            data: {
+              ...(item.name && { name: item.name }),
+              ...(item.priceAdjustment !== undefined && { priceAdjustment: item.priceAdjustment }),
+              ...(item.adjustmentType && { adjustmentType: item.adjustmentType }),
+            },
+          });
+        } else {
+          await tx.productMilk.create({
+            data: {
+              productId: id,
+              name: item.name || "Milk",
+              priceAdjustment: item.priceAdjustment ?? 0,
+              adjustmentType: item.adjustmentType || "ADD",
+            },
+          });
         }
-        await tx.productMilk.update({
-          where: { id: item.id },
-          data: {
-            name: item.name,
-            priceAdjustment: item.priceAdjustment,
-            adjustmentType: item.adjustmentType,
-          },
-        });
       }
     }
 
-    // Update extras in-place if provided
-    if (productExtra !== undefined && productExtra.length > 0) {
+    // Update, create or remove product extras
+    if (productExtra !== undefined) {
+      const existingExtras = await tx.productExtra.findMany({
+        where: { productId: id },
+        select: { id: true },
+      });
+      const keepIds = productExtra.map((e) => e.id).filter((id): id is string => Boolean(id));
+      const deletedIds = existingExtras.filter((e) => !keepIds.includes(e.id)).map((e) => e.id);
+
+      if (deletedIds.length > 0) {
+        await tx.productExtra.deleteMany({
+          where: { id: { in: deletedIds } },
+        });
+      }
+
       for (const item of productExtra) {
-        const extraRecord = await tx.productExtra.findFirst({
-          where: { id: item.id, productId: id },
-        });
-        if (!extraRecord) {
-          throw new ApiError(
-            StatusCodes.NOT_FOUND,
-            `ProductExtra record with ID ${item.id} not found for this product`
-          );
+        if (item.id) {
+          await tx.productExtra.update({
+            where: { id: item.id },
+            data: {
+              ...(item.name && { name: item.name }),
+              ...(item.price !== undefined && { price: item.price }),
+            },
+          });
+        } else {
+          await tx.productExtra.create({
+            data: {
+              productId: id,
+              name: item.name || "Extra",
+              price: item.price ?? 0,
+            },
+          });
         }
-        await tx.productExtra.update({
-          where: { id: item.id },
-          data: {
-            name: item.name,
-            price: item.price,
-          },
-        });
       }
     }
   });
@@ -295,16 +333,7 @@ const updateProduct = async (id: string, payload: IUpdateProductPayload) => {
   // Fetch and return the updated product
   const finalProduct = await prisma.product.findUnique({
     where: { id },
-    include: {
-      productSizes: true,
-      productMilks: true,
-      productExtras: true,
-      category: {
-        select: {
-          name: true,
-        },
-      },
-    },
+    include: productInclude,
   });
 
   return finalProduct;

@@ -9,7 +9,7 @@ const createCoinProductZodSchema = z.object({
       message: "needPoint is required and must be a number",
     })
     .int("needPoint must be an integer")
-    .positive("needPoint must be positive"),
+    .min(0, "needPoint cannot be negative"),
 });
 
 const updateCoinProductZodSchema = z.object({
@@ -17,7 +17,7 @@ const updateCoinProductZodSchema = z.object({
   needPoint: z
     .number()
     .int("needPoint must be an integer")
-    .positive("needPoint must be positive")
+    .min(0, "needPoint cannot be negative")
     .optional(),
 });
 

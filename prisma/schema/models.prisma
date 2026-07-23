@@ -22,6 +22,7 @@ model User {
     orders             Order[]
     payments           Payment[]
     rewardPayments     RewardPayment[]
+    notifications      Notification[]
 
     @@map("users")
 }
@@ -422,5 +423,21 @@ model ServiceCharge {
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
+}
+
+model Notification {
+    id        String   @id @default(cuid())
+    userId    String?
+    user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+    title     String
+    message   String
+    type      String   @default("ORDER")
+    orderId   String?
+    isRead    Boolean  @default(false)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("notifications")
 }
 

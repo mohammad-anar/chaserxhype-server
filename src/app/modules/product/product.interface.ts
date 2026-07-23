@@ -19,7 +19,7 @@ export type ICreateProductExtraInput = {
 };
 
 export type IUpdateProductSizeInput = {
-  id: string; // Required to target the specific variation record
+  id?: string;
   name?: string;
   oz?: string;
   priceAdjustment?: number;
@@ -27,20 +27,20 @@ export type IUpdateProductSizeInput = {
 };
 
 export type IUpdateProductMilkInput = {
-  id: string; // Required to target the specific variation record
+  id?: string;
   name?: string;
   priceAdjustment?: number;
   adjustmentType?: AdjustmentType;
 };
 
 export type IUpdateProductExtraInput = {
-  id: string; // Required to target the specific variation record
+  id?: string;
   name?: string;
   price?: number;
 };
 
 export type ICreateProductPayload = {
-  name: string; // Used to generate slug
+  name: string;
   categoryId: string;
   shortDescription: string;
   description: string;

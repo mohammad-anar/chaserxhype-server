@@ -17,6 +17,7 @@ import { ServiceChargeRouter } from "../modules/serviceCharge/serviceCharge.rout
 import { CartRouter } from "../modules/cart/cart.routes.js";
 import { OrderRouter } from "../modules/order/order.routes.js";
 import { PaymentRouter } from "../modules/payment/payment.routes.js";
+import { NotificationRouter } from "../modules/notification/notification.routes.js";
 
 const router = express.Router();
 
@@ -92,6 +93,10 @@ const moduleRoutes = [
   {
     path: "/payment",
     route: PaymentRouter,
+  },
+  {
+    path: "/notification",
+    route: NotificationRouter,
   },
 ];
 

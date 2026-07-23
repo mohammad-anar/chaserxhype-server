@@ -6,6 +6,7 @@ import { paginationHelper } from "../../../helpers/paginationHelper.js";
 import { OrderStatus, Order, PayType } from "@prisma/client";
 import Stripe from "stripe";
 import config from "../../../config/index.js";
+import { emitOrderNotification } from "../../../helpers/socketHelper.js";
 
 const stripe = new Stripe(config.stripe.stripe_secret_key || "");
 
@@ -51,9 +52,36 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
     const initialStatus = (isCoinProduct && totalAmount <= 0) ? "CONFIRMED" : "PENDING";
     const initialPaymentStatus = (isCoinProduct && totalAmount <= 0) ? "PAID" : "PENDING";
 
+    let shippingAddressPayload = payload.shippingAddress;
+    if (!shippingAddressPayload) {
+      const userSavedAddress = await tx.address.findFirst({ where: { userId } });
+      const userRecord = await tx.user.findUnique({ where: { id: userId } });
+      if (userSavedAddress) {
+        shippingAddressPayload = {
+          fullName: userRecord?.name || undefined,
+          street1: userSavedAddress.street1,
+          state: userSavedAddress.state || undefined,
+          city: userSavedAddress.city,
+          country: userSavedAddress.country,
+          postalCode: undefined,
+          phone: userRecord?.phone || undefined,
+        };
+      } else if (userRecord) {
+        shippingAddressPayload = {
+          fullName: userRecord.name,
+          street1: "123 Coffee Bean St",
+          state: "NY",
+          city: "New York",
+          country: "United States",
+          postalCode: "10001",
+          phone: userRecord.phone || undefined,
+        };
+      }
+    }
+
     let finalNote = payload.note || "";
-    if (payload.shippingAddress) {
-      const sa = payload.shippingAddress;
+    if (shippingAddressPayload) {
+      const sa = shippingAddressPayload;
       const addrStr = `Shipping: ${sa.street1}, ${sa.city}, ${sa.state ? `${sa.state}, ` : ""}${sa.country}`;
       finalNote = finalNote ? `${finalNote} | ${addrStr}` : addrStr;
     }
@@ -78,17 +106,17 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
       },
     });
 
-    if (payload.shippingAddress) {
+    if (shippingAddressPayload) {
       await tx.shippingAddress.create({
         data: {
           orderId: order.id,
-          fullName: (payload.shippingAddress as any)?.fullName || null,
-          street1: payload.shippingAddress.street1,
-          state: payload.shippingAddress.state || null,
-          city: payload.shippingAddress.city,
-          country: payload.shippingAddress.country,
-          postalCode: (payload.shippingAddress as any)?.postalCode || null,
-          phone: (payload.shippingAddress as any)?.phone || null,
+          fullName: (shippingAddressPayload as any)?.fullName || null,
+          street1: shippingAddressPayload.street1,
+          state: shippingAddressPayload.state || null,
+          city: shippingAddressPayload.city,
+          country: shippingAddressPayload.country,
+          postalCode: (shippingAddressPayload as any)?.postalCode || null,
+          phone: (shippingAddressPayload as any)?.phone || null,
         },
       });
     }
@@ -390,6 +418,16 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
       },
     });
 
+    try {
+      emitOrderNotification({
+        type: "ORDER_PLACED",
+        order: resultOrder,
+        message: `New Order #${resultOrder?.orderNumber || ''} placed!`,
+      });
+    } catch (e) {
+      console.error("Socket notification error on checkout:", e);
+    }
+
     return {
       order: resultOrder,
       paymentUrl,
@@ -475,8 +513,33 @@ const getOrderById = async (userId: string, role: string, orderId: string) => {
 const getAllOrders = async (options: any) => {
   const { page, limit, skip, sortBy, sortOrder } =
     paginationHelper.calculatePagination(options);
+  const { status, searchTerm } = options;
+
+  const andConditions: any[] = [];
+
+  if (status && String(status).toUpperCase() !== "ALL") {
+    let targetStatus = String(status).toUpperCase();
+    if (targetStatus === "CANCELLED") targetStatus = "CANCELED";
+    andConditions.push({ status: targetStatus as OrderStatus });
+  }
+
+  if (searchTerm && String(searchTerm).trim() !== "") {
+    const term = String(searchTerm).trim();
+    andConditions.push({
+      OR: [
+        { orderNumber: { contains: term, mode: "insensitive" } },
+        { user: { name: { contains: term, mode: "insensitive" } } },
+        { user: { email: { contains: term, mode: "insensitive" } } },
+        { shippingAddress: { fullName: { contains: term, mode: "insensitive" } } },
+        { shippingAddress: { phone: { contains: term, mode: "insensitive" } } },
+      ],
+    });
+  }
+
+  const whereConditions = andConditions.length > 0 ? { AND: andConditions } : {};
 
   const result = await prisma.order.findMany({
+    where: whereConditions,
     skip,
     take: limit,
     orderBy: {
@@ -490,6 +553,7 @@ const getAllOrders = async (options: any) => {
           email: true,
         },
       },
+      shippingAddress: true,
       orderItems: {
         include: {
           orderItemExtras: {
@@ -506,13 +570,42 @@ const getAllOrders = async (options: any) => {
     },
   });
 
-  const total = await prisma.order.count();
+  const total = await prisma.order.count({ where: whereConditions });
+
+  const statusCountsGroupBy = await prisma.order.groupBy({
+    by: ["status"],
+    _count: {
+      id: true,
+    },
+  });
+
+  const statusCounts: Record<string, number> = {
+    PREPARING: 0,
+    COMPLETED: 0,
+    CANCELED: 0,
+    PENDING: 0,
+    CONFIRMED: 0,
+    READY: 0,
+    OUT_FOR_DELIVERY: 0,
+    REFUNDED: 0,
+    FAILED: 0,
+    TOTAL: 0,
+  };
+
+  statusCountsGroupBy.forEach((item) => {
+    statusCounts[item.status] = item._count.id;
+    statusCounts.TOTAL += item._count.id;
+  });
+
+  const totalPage = Math.ceil(total / limit) || 1;
 
   return {
     meta: {
       page,
       limit,
       total,
+      totalPage,
+      statusCounts,
     },
     data: result,
   };
@@ -546,6 +639,16 @@ const updateOrderStatus = async (orderId: string, status: OrderStatus) => {
       rewardPayments: true,
     },
   });
+
+  try {
+    emitOrderNotification({
+      type: "ORDER_STATUS_CHANGED",
+      order: result,
+      message: `Order #${result.orderNumber} status changed to ${status}!`,
+    });
+  } catch (e) {
+    console.error("Socket notification error on status update:", e);
+  }
 
   return result;
 };
