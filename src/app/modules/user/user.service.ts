@@ -15,9 +15,13 @@ import {
 } from "./user.interface.js";
 
 const createUser = async (payload: ICreateUserPayload) => {
+  const normalizedEmail = payload.email.trim().toLowerCase();
+
   // Check if email already exists
-  const existingUserByEmail = await prisma.user.findUnique({
-    where: { email: payload.email },
+  const existingUserByEmail = await prisma.user.findFirst({
+    where: {
+      email: { equals: normalizedEmail, mode: "insensitive" },
+    },
   });
   if (existingUserByEmail) {
     throw new ApiError(StatusCodes.BAD_REQUEST, "Email is already registered");
@@ -48,7 +52,7 @@ const createUser = async (payload: ICreateUserPayload) => {
     const user = await tx.user.create({
       data: {
         name: payload.name,
-        email: payload.email,
+        email: normalizedEmail,
         phone: payload.phone || null,
         password: hashedPassword,
         otpCode,

@@ -18,6 +18,12 @@ import { CartRouter } from "../modules/cart/cart.routes.js";
 import { OrderRouter } from "../modules/order/order.routes.js";
 import { PaymentRouter } from "../modules/payment/payment.routes.js";
 import { NotificationRouter } from "../modules/notification/notification.routes.js";
+import { IngredientRouter } from "../modules/ingredient/ingredient.routes.js";
+import { RecipeRouter } from "../modules/recipe/recipe.routes.js";
+import { BaristaRouter } from "../modules/barista/barista.routes.js";
+import { InvoiceRouter } from "../modules/invoice/invoice.routes.js";
+import { AutomationRouter } from "../modules/automation/automation.routes.js";
+import { AIRouter } from "../modules/ai/ai.routes.js";
 
 const router = express.Router();
 
@@ -97,6 +103,30 @@ const moduleRoutes = [
   {
     path: "/notification",
     route: NotificationRouter,
+  },
+  {
+    path: "/ingredient",
+    route: IngredientRouter,
+  },
+  {
+    path: "/recipe",
+    route: RecipeRouter,
+  },
+  {
+    path: "/barista",
+    route: BaristaRouter,
+  },
+  {
+    path: "/invoice",
+    route: InvoiceRouter,
+  },
+  {
+    path: "/automation",
+    route: AutomationRouter,
+  },
+  {
+    path: "/ai",
+    route: AIRouter,
   },
 ];
 

@@ -26,14 +26,33 @@ router.get(
 );
 
 router.get(
-  "/:orderId",
+  "/barista/assigned-orders",
+  auth("BARISTA", "ADMIN"),
+  OrderController.getBaristaAssignedOrders
+);
+
+router.get(
+  "/tips/daily-summary",
+  auth("ADMIN"),
+  OrderController.getDailyTipsSummary
+);
+
+router.post(
+  "/tip/:orderId",
   auth("USER", "ADMIN"),
+  validateRequest(OrderValidation.addTipZodSchema),
+  OrderController.addTipToOrder
+);
+
+router.get(
+  "/:orderId",
+  auth("USER", "ADMIN", "BARISTA"),
   OrderController.getOrderById
 );
 
 router.patch(
   "/status/:orderId",
-  auth("ADMIN"),
+  auth("ADMIN", "BARISTA"),
   validateRequest(OrderValidation.updateOrderStatusZodSchema),
   OrderController.updateOrderStatus
 );

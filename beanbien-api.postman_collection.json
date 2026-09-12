@@ -1,0 +1,1456 @@
+{
+  "info": {
+    "_postman_id": "chaserxhype-beanbien-api-collection",
+    "name": "Bean Fien — ChaserXHype API",
+    "description": "Complete API collection for the Bean Fien backend. Base URL: http://localhost:5000/api/v1\n\n**Auth:** Most routes require a Bearer JWT token.\nSet the `accessToken` collection variable after calling POST /auth/login.\n\n**Roles:** USER · ADMIN · BARISTA",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "PASTE_YOUR_JWT_HERE",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "user_id_here",
+      "type": "string"
+    },
+    {
+      "key": "orderId",
+      "value": "order_id_here",
+      "type": "string"
+    },
+    {
+      "key": "productId",
+      "value": "product_id_here",
+      "type": "string"
+    },
+    {
+      "key": "categoryId",
+      "value": "category_id_here",
+      "type": "string"
+    },
+    {
+      "key": "baristaId",
+      "value": "barista_id_here",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "🔐 Auth",
+      "description": "Authentication — login, register, OTP, token refresh, password management",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@beanbien.co\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"]},
+            "description": "Returns accessToken + refreshToken. Copy accessToken into the `accessToken` collection variable."
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"YOUR_REFRESH_TOKEN_HERE\"\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/auth/refresh-token", "host": ["{{baseUrl}}"], "path": ["auth", "refresh-token"]},
+            "description": "Get a new access token using a valid refresh token."
+          }
+        },
+        {
+          "name": "Verify Email (OTP)",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@beanbien.co\",\n  \"otp\": \"123456\"\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/auth/verify-email", "host": ["{{baseUrl}}"], "path": ["auth", "verify-email"]}
+          }
+        },
+        {
+          "name": "Resend OTP",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@beanbien.co\"\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/auth/resend-otp", "host": ["{{baseUrl}}"], "path": ["auth", "resend-otp"]}
+          }
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@beanbien.co\"\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/auth/forgot-password", "host": ["{{baseUrl}}"], "path": ["auth", "forgot-password"]}
+          }
+        },
+        {
+          "name": "Verify OTP (Forgot Password)",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@beanbien.co\",\n  \"otp\": \"123456\"\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/auth/verify-otp", "host": ["{{baseUrl}}"], "path": ["auth", "verify-otp"]}
+          }
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@beanbien.co\",\n  \"newPassword\": \"NewPassword123!\",\n  \"resetToken\": \"RESET_TOKEN_FROM_VERIFY_OTP\"\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/auth/reset-password", "host": ["{{baseUrl}}"], "path": ["auth", "reset-password"]}
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"oldPassword\": \"Password123!\",\n  \"newPassword\": \"NewPassword456!\"\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/auth/change-password", "host": ["{{baseUrl}}"], "path": ["auth", "change-password"]},
+            "description": "AUTH: USER or ADMIN"
+          }
+        }
+      ]
+    },
+    {
+      "name": "👤 User",
+      "description": "User registration and profile management",
+      "item": [
+        {
+          "name": "Register (Create User)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {"key": "name", "value": "Alice Johnson", "type": "text"},
+                {"key": "email", "value": "alice@beanbien.co", "type": "text"},
+                {"key": "password", "value": "Password123!", "type": "text"},
+                {"key": "phone", "value": "+1234567890", "type": "text"},
+                {"key": "profileImage", "type": "file", "src": ""}
+              ]
+            },
+            "url": {"raw": "{{baseUrl}}/user/create-user", "host": ["{{baseUrl}}"], "path": ["user", "create-user"]},
+            "description": "Public endpoint. Accepts multipart/form-data for profile image upload."
+          }
+        },
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/user/my-profile", "host": ["{{baseUrl}}"], "path": ["user", "my-profile"]},
+            "description": "AUTH: USER or ADMIN"
+          }
+        },
+        {
+          "name": "Update My Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {"key": "name", "value": "Alice Smith", "type": "text"},
+                {"key": "phone", "value": "+9876543210", "type": "text"},
+                {"key": "profileImage", "type": "file", "src": ""}
+              ]
+            },
+            "url": {"raw": "{{baseUrl}}/user/update-profile", "host": ["{{baseUrl}}"], "path": ["user", "update-profile"]},
+            "description": "AUTH: USER or ADMIN. Accepts multipart/form-data."
+          }
+        },
+        {
+          "name": "[ADMIN] Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/user?page=1&limit=20&sortBy=createdAt&sortOrder=desc",
+              "host": ["{{baseUrl}}"],
+              "path": ["user"],
+              "query": [
+                {"key": "page", "value": "1"},
+                {"key": "limit", "value": "20"},
+                {"key": "sortBy", "value": "createdAt"},
+                {"key": "sortOrder", "value": "desc"}
+              ]
+            },
+            "description": "AUTH: ADMIN only"
+          }
+        },
+        {
+          "name": "[ADMIN] Get User by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/user/{{userId}}", "host": ["{{baseUrl}}"], "path": ["user", "{{userId}}"]},
+            "description": "AUTH: ADMIN only"
+          }
+        },
+        {
+          "name": "[ADMIN] Update User Status",
+          "request": {
+            "method": "PATCH",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/user/{{userId}}/status", "host": ["{{baseUrl}}"], "path": ["user", "{{userId}}", "status"]},
+            "description": "AUTH: ADMIN. Values: ACTIVE | BLOCKED | DELETED"
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/user/{{userId}}", "host": ["{{baseUrl}}"], "path": ["user", "{{userId}}"]},
+            "description": "AUTH: USER (self) or ADMIN"
+          }
+        }
+      ]
+    },
+    {
+      "name": "📍 Address",
+      "description": "User shipping addresses",
+      "item": [
+        {
+          "name": "Create Address",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Alice Johnson\",\n  \"street1\": \"123 Coffee Lane\",\n  \"city\": \"Seattle\",\n  \"state\": \"WA\",\n  \"country\": \"US\",\n  \"postalCode\": \"98101\",\n  \"phone\": \"+12065550100\"\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/address", "host": ["{{baseUrl}}"], "path": ["address"]},
+            "description": "AUTH: USER or ADMIN"
+          }
+        },
+        {
+          "name": "Get My Addresses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/address/my-addresses", "host": ["{{baseUrl}}"], "path": ["address", "my-addresses"]},
+            "description": "AUTH: USER or ADMIN"
+          }
+        },
+        {
+          "name": "Get Address by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/address/:id", "host": ["{{baseUrl}}"], "path": ["address", ":id"],
+              "variable": [{"key": "id", "value": "address_id_here"}]},
+            "description": "AUTH: USER or ADMIN"
+          }
+        },
+        {
+          "name": "Update Address",
+          "request": {
+            "method": "PATCH",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"street1\": \"456 Espresso Ave\",\n  \"city\": \"Portland\"\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/address/:id", "host": ["{{baseUrl}}"], "path": ["address", ":id"],
+              "variable": [{"key": "id", "value": "address_id_here"}]},
+            "description": "AUTH: USER or ADMIN"
+          }
+        },
+        {
+          "name": "Delete Address",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/address/:id", "host": ["{{baseUrl}}"], "path": ["address", ":id"],
+              "variable": [{"key": "id", "value": "address_id_here"}]},
+            "description": "AUTH: USER or ADMIN"
+          }
+        }
+      ]
+    },
+    {
+      "name": "☕ Products",
+      "description": "Coffee drink products (menu items)",
+      "item": [
+        {
+          "name": "Get All Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/product?page=1&limit=20&categoryId=&temperatureType=HOT&sortBy=createdAt&sortOrder=desc",
+              "host": ["{{baseUrl}}"],
+              "path": ["product"],
+              "query": [
+                {"key": "page", "value": "1"},
+                {"key": "limit", "value": "20"},
+                {"key": "categoryId", "value": "", "description": "Filter by category ID"},
+                {"key": "temperatureType", "value": "HOT", "description": "HOT | COLD | BOTH"},
+                {"key": "sortBy", "value": "createdAt"},
+                {"key": "sortOrder", "value": "desc"}
+              ]
+            },
+            "description": "Public endpoint. No auth required."
+          }
+        },
+        {
+          "name": "Get Product by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/product/{{productId}}", "host": ["{{baseUrl}}"], "path": ["product", "{{productId}}"]},
+            "description": "Public endpoint."
+          }
+        },
+        {
+          "name": "[ADMIN] Create Product",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {"key": "name", "value": "Vanilla Mist Latte", "type": "text"},
+                {"key": "categoryId", "value": "{{categoryId}}", "type": "text"},
+                {"key": "basePrice", "value": "5.50", "type": "text"},
+                {"key": "shortDescription", "value": "Smooth vanilla with subtle caramel warmth", "type": "text"},
+                {"key": "description", "value": "Full product description here", "type": "text"},
+                {"key": "temperatureType", "value": "HOT", "type": "text", "description": "HOT | COLD | BOTH"},
+                {"key": "sweetnessLevel", "value": "2", "type": "text", "description": "1-5"},
+                {"key": "caffeineMg", "value": "65", "type": "text"},
+                {"key": "bitternessLevel", "value": "2", "type": "text"},
+                {"key": "strengthLevel", "value": "2", "type": "text"},
+                {"key": "flavorProfile", "value": "Vanilla, Caramel", "type": "text"},
+                {"key": "coin", "value": "10", "type": "text", "description": "Loyalty coins earned on purchase"},
+                {"key": "isAvailable", "value": "true", "type": "text"},
+                {"key": "image", "type": "file", "src": "", "description": "Can upload multiple images"}
+              ]
+            },
+            "url": {"raw": "{{baseUrl}}/product", "host": ["{{baseUrl}}"], "path": ["product"]},
+            "description": "AUTH: ADMIN. Accepts multipart/form-data."
+          }
+        },
+        {
+          "name": "[ADMIN] Update Product",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {"key": "name", "value": "Updated Latte Name", "type": "text"},
+                {"key": "basePrice", "value": "6.00", "type": "text"},
+                {"key": "isAvailable", "value": "true", "type": "text"}
+              ]
+            },
+            "url": {"raw": "{{baseUrl}}/product/{{productId}}", "host": ["{{baseUrl}}"], "path": ["product", "{{productId}}"]},
+            "description": "AUTH: ADMIN"
+          }
+        },
+        {
+          "name": "[ADMIN] Delete Product",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/product/{{productId}}", "host": ["{{baseUrl}}"], "path": ["product", "{{productId}}"]},
+            "description": "AUTH: ADMIN. Soft delete."
+          }
+        }
+      ]
+    },
+    {
+      "name": "🗂️ Categories",
+      "description": "Product categories (e.g. Lattes, Cold Brew, Espresso)",
+      "item": [
+        {
+          "name": "Get All Categories (Public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/category", "host": ["{{baseUrl}}"], "path": ["category"]},
+            "description": "Public — no auth needed"
+          }
+        },
+        {
+          "name": "[ADMIN] Get All Categories (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/category/admin", "host": ["{{baseUrl}}"], "path": ["category", "admin"]},
+            "description": "AUTH: ADMIN — includes hidden/inactive categories"
+          }
+        },
+        {
+          "name": "Get Category by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/category/{{categoryId}}", "host": ["{{baseUrl}}"], "path": ["category", "{{categoryId}}"]},
+            "description": "Public"
+          }
+        },
+        {
+          "name": "[ADMIN] Create Category",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Cold Brew\",\n  \"description\": \"Slow-steeped cold brew coffees\",\n  \"isActive\": true\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/category", "host": ["{{baseUrl}}"], "path": ["category"]},
+            "description": "AUTH: ADMIN"
+          }
+        },
+        {
+          "name": "[ADMIN] Update Category",
+          "request": {
+            "method": "PATCH",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Category Name\",\n  \"isActive\": true\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/category/{{categoryId}}", "host": ["{{baseUrl}}"], "path": ["category", "{{categoryId}}"]},
+            "description": "AUTH: ADMIN"
+          }
+        },
+        {
+          "name": "[ADMIN] Delete Category",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/category/{{categoryId}}", "host": ["{{baseUrl}}"], "path": ["category", "{{categoryId}}"]},
+            "description": "AUTH: ADMIN"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🛒 Cart",
+      "description": "Shopping cart — add, update, remove items",
+      "item": [
+        {
+          "name": "Get Cart",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/cart", "host": ["{{baseUrl}}"], "path": ["cart"]},
+            "description": "AUTH: USER or ADMIN. Returns current cart with total."
+          }
+        },
+        {
+          "name": "Add Item to Cart",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isCoinProduct\": false,\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 1,\n  \"selectedSizeId\": \"size_id_here\",\n  \"selectedMildId\": \"mild_id_here\",\n  \"extras\": [\"extra_id_1\", \"extra_id_2\"]\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/cart/add-item", "host": ["{{baseUrl}}"], "path": ["cart", "add-item"]},
+            "description": "AUTH: USER or ADMIN. For coin products set isCoinProduct: true and use coinProductId instead of productId."
+          }
+        },
+        {
+          "name": "Update Cart Item",
+          "request": {
+            "method": "PATCH",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 2,\n  \"selectedSizeId\": \"size_large\",\n  \"extras\": [\"extra_oat_milk\"]\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/cart/update-item/:cartItemId", "host": ["{{baseUrl}}"], "path": ["cart", "update-item", ":cartItemId"],
+              "variable": [{"key": "cartItemId", "value": "cart_item_id_here"}]},
+            "description": "AUTH: USER or ADMIN"
+          }
+        },
+        {
+          "name": "Remove Cart Item",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/cart/remove-item/:cartItemId", "host": ["{{baseUrl}}"], "path": ["cart", "remove-item", ":cartItemId"],
+              "variable": [{"key": "cartItemId", "value": "cart_item_id_here"}]},
+            "description": "AUTH: USER or ADMIN"
+          }
+        },
+        {
+          "name": "Clear Cart",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/cart/clear", "host": ["{{baseUrl}}"], "path": ["cart", "clear"]},
+            "description": "AUTH: USER or ADMIN. Removes all items from cart."
+          }
+        }
+      ]
+    },
+    {
+      "name": "📦 Orders",
+      "description": "Order checkout, management, status updates, tips, and refunds",
+      "item": [
+        {
+          "name": "Checkout (Place Order)",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"payType\": \"CARD\",\n  \"note\": \"Extra hot please!\",\n  \"shippingAddress\": {\n    \"fullName\": \"Alice Johnson\",\n    \"street1\": \"123 Coffee Lane\",\n    \"city\": \"Seattle\",\n    \"state\": \"WA\",\n    \"country\": \"US\",\n    \"postalCode\": \"98101\",\n    \"phone\": \"+12065550100\"\n  }\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/order/checkout", "host": ["{{baseUrl}}"], "path": ["order", "checkout"]},
+            "description": "AUTH: USER or ADMIN. Places order from current cart. Returns Stripe checkout URL for CARD payments."
+          }
+        },
+        {
+          "name": "Get My Orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/order/my-orders?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["order", "my-orders"],
+              "query": [
+                {"key": "page", "value": "1"},
+                {"key": "limit", "value": "10"}
+              ]
+            },
+            "description": "AUTH: USER or ADMIN. Returns order list including assignedBarista info."
+          }
+        },
+        {
+          "name": "Get Order by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/order/{{orderId}}", "host": ["{{baseUrl}}"], "path": ["order", "{{orderId}}"]},
+            "description": "AUTH: USER, ADMIN, or BARISTA"
+          }
+        },
+        {
+          "name": "[ADMIN] Get All Orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/order/all-orders?page=1&limit=20&status=PENDING&sortBy=createdAt&sortOrder=desc",
+              "host": ["{{baseUrl}}"],
+              "path": ["order", "all-orders"],
+              "query": [
+                {"key": "page", "value": "1"},
+                {"key": "limit", "value": "20"},
+                {"key": "status", "value": "PENDING", "description": "PENDING | CONFIRMED | PREPARING | READY | COMPLETED | CANCELED"},
+                {"key": "sortBy", "value": "createdAt"},
+                {"key": "sortOrder", "value": "desc"}
+              ]
+            },
+            "description": "AUTH: ADMIN only"
+          }
+        },
+        {
+          "name": "[BARISTA/ADMIN] Get Assigned Orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/order/barista/assigned-orders", "host": ["{{baseUrl}}"], "path": ["order", "barista", "assigned-orders"]},
+            "description": "AUTH: BARISTA or ADMIN. Returns orders assigned to the currently authenticated barista."
+          }
+        },
+        {
+          "name": "[BARISTA/ADMIN] Update Order Status",
+          "request": {
+            "method": "PATCH",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PREPARING\"\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/order/status/{{orderId}}", "host": ["{{baseUrl}}"], "path": ["order", "status", "{{orderId}}"]},
+            "description": "AUTH: ADMIN or BARISTA. Valid statuses: PENDING | CONFIRMED | PREPARING | READY | OUT_FOR_DELIVERY | COMPLETED | CANCELED | FAILED"
+          }
+        },
+        {
+          "name": "Tip Barista (Add Tip to Order)",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 3.00,\n  \"message\": \"Best oat milk latte ever! ☕\",\n  \"payType\": \"CARD\"\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/order/tip/{{orderId}}", "host": ["{{baseUrl}}"], "path": ["order", "tip", "{{orderId}}"]},
+            "description": "AUTH: USER or ADMIN. Adds a gratuity tip to a completed order. amount must be > 0."
+          }
+        },
+        {
+          "name": "[ADMIN] Daily Tips Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/order/tips/daily-summary?days=30",
+              "host": ["{{baseUrl}}"],
+              "path": ["order", "tips", "daily-summary"],
+              "query": [{"key": "days", "value": "30", "description": "Number of past days to include"}]
+            },
+            "description": "AUTH: ADMIN. Returns KPIs, daily breakdown, and barista leaderboard."
+          }
+        },
+        {
+          "name": "[ADMIN] Refund Order",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/order/refund/{{orderId}}", "host": ["{{baseUrl}}"], "path": ["order", "refund", "{{orderId}}"]},
+            "description": "AUTH: ADMIN. Triggers Stripe refund."
+          }
+        }
+      ]
+    },
+    {
+      "name": "💳 Payment",
+      "description": "Stripe payments, webhooks, and payment history",
+      "item": [
+        {
+          "name": "Stripe Webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "stripe-signature", "value": "STRIPE_WEBHOOK_SIG_HERE"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"type\": \"checkout.session.completed\", \"data\": {} }"
+            },
+            "url": {"raw": "{{baseUrl}}/payment/webhook", "host": ["{{baseUrl}}"], "path": ["payment", "webhook"]},
+            "description": "No auth. Receives Stripe events. Do not call manually in production."
+          }
+        },
+        {
+          "name": "Get My Payments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/payment/my-payments", "host": ["{{baseUrl}}"], "path": ["payment", "my-payments"]},
+            "description": "AUTH: USER or ADMIN"
+          }
+        },
+        {
+          "name": "Get My Reward Payments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/payment/my-reward-payments", "host": ["{{baseUrl}}"], "path": ["payment", "my-reward-payments"]},
+            "description": "AUTH: USER or ADMIN. Coin/reward-based transactions."
+          }
+        },
+        {
+          "name": "[ADMIN] Get All Payments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/payment/all-payments?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["payment", "all-payments"],
+              "query": [{"key": "page", "value": "1"}, {"key": "limit", "value": "20"}]
+            },
+            "description": "AUTH: ADMIN"
+          }
+        },
+        {
+          "name": "[ADMIN] Get All Reward Payments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/payment/all-reward-payments", "host": ["{{baseUrl}}"], "path": ["payment", "all-reward-payments"]},
+            "description": "AUTH: ADMIN"
+          }
+        }
+      ]
+    },
+    {
+      "name": "☕ Barista",
+      "description": "Barista profile management, order assignment, and claiming",
+      "item": [
+        {
+          "name": "Get My Barista Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/barista/me", "host": ["{{baseUrl}}"], "path": ["barista", "me"]},
+            "description": "AUTH: BARISTA or ADMIN. Returns profile + today's metrics."
+          }
+        },
+        {
+          "name": "Update My Barista Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isAvailable\": true,\n  \"station\": \"Specialty Bar\",\n  \"name\": \"Jordan\",\n  \"phone\": \"+12065550199\"\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/barista/me", "host": ["{{baseUrl}}"], "path": ["barista", "me"]},
+            "description": "AUTH: BARISTA or ADMIN"
+          }
+        },
+        {
+          "name": "Claim Order (Self-assign)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/barista/claim/{{orderId}}", "host": ["{{baseUrl}}"], "path": ["barista", "claim", "{{orderId}}"]},
+            "description": "AUTH: BARISTA or ADMIN. Barista self-claims an unassigned order."
+          }
+        },
+        {
+          "name": "[ADMIN/BARISTA] Get All Baristas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/barista", "host": ["{{baseUrl}}"], "path": ["barista"]},
+            "description": "AUTH: ADMIN or BARISTA"
+          }
+        },
+        {
+          "name": "[ADMIN] Create Barista",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jordan Lee\",\n  \"email\": \"jordan@beanbien.co\",\n  \"password\": \"BaristaPass123!\",\n  \"phone\": \"+12065550199\",\n  \"station\": \"Specialty Bar\",\n  \"skillLevel\": 4\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/barista", "host": ["{{baseUrl}}"], "path": ["barista"]},
+            "description": "AUTH: ADMIN. Creates a barista account (role: BARISTA)."
+          }
+        },
+        {
+          "name": "[ADMIN] Update Barista Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isAvailable\": true,\n  \"skillLevel\": 5,\n  \"station\": \"Cold Bar\"\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/barista/{{baristaId}}", "host": ["{{baseUrl}}"], "path": ["barista", "{{baristaId}}"]},
+            "description": "AUTH: ADMIN"
+          }
+        },
+        {
+          "name": "[ADMIN] Assign Barista to Order",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"baristaId\": \"{{baristaId}}\"\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/barista/assign/{{orderId}}", "host": ["{{baseUrl}}"], "path": ["barista", "assign", "{{orderId}}"]},
+            "description": "AUTH: ADMIN. If baristaId omitted, auto-assigns best available barista."
+          }
+        }
+      ]
+    },
+    {
+      "name": "🤖 AI / Recommendations",
+      "description": "AI-powered mood-based drink recommendations, natural language search, and chat assistant",
+      "item": [
+        {
+          "name": "Mood-Based Recommendation",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mood\": \"Stressed\",\n  \"inputText\": \"I want something warm and low sugar\",\n  \"preferences\": {\n    \"temperature\": \"HOT\",\n    \"sweet\": \"low\",\n    \"caffeine\": \"low\",\n    \"milk\": true\n  }\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/ai/mood-recommendation", "host": ["{{baseUrl}}"], "path": ["ai", "mood-recommendation"]},
+            "description": "Auth: OPTIONAL (works for guests). Returns top 3-5 ranked products with AI reasons.\nMoods: Stressed | Energetic | Happy | Chill | Sleepy | Focused\ntemperature: HOT | COLD | BOTH\ncaffeine: none | low | medium | high"
+          }
+        },
+        {
+          "name": "Natural Language Product Search",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"something cold and not too sweet with oat milk\"\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/ai/product-search", "host": ["{{baseUrl}}"], "path": ["ai", "product-search"]},
+            "description": "No auth required. NLP-powered product filtering from natural language queries."
+          }
+        },
+        {
+          "name": "Customer Assistant Chat",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"What's the difference between a latte and a cappuccino?\",\n  \"conversationHistory\": [\n    {\"role\": \"user\", \"content\": \"Hi!\"},\n    {\"role\": \"assistant\", \"content\": \"Hello! How can I help you today?\"}\n  ]\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/ai/chat", "host": ["{{baseUrl}}"], "path": ["ai", "chat"]},
+            "description": "No auth required. Pass conversationHistory to maintain multi-turn context."
+          }
+        },
+        {
+          "name": "Get Recommendation History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ai/recommendations/history?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["ai", "recommendations", "history"],
+              "query": [{"key": "page", "value": "1"}, {"key": "limit", "value": "10"}]
+            },
+            "description": "AUTH: USER, ADMIN, or BARISTA. Admin sees all history; users see their own."
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔔 Notifications",
+      "description": "In-app notifications for orders, tips, and system events",
+      "item": [
+        {
+          "name": "Get My Notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notification/my-notifications?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["notification", "my-notifications"],
+              "query": [{"key": "page", "value": "1"}, {"key": "limit", "value": "20"}]
+            },
+            "description": "AUTH: USER or ADMIN"
+          }
+        },
+        {
+          "name": "Mark All as Read",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/notification/read-all", "host": ["{{baseUrl}}"], "path": ["notification", "read-all"]},
+            "description": "AUTH: USER or ADMIN"
+          }
+        },
+        {
+          "name": "Mark Notification as Read",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/notification/read/:id", "host": ["{{baseUrl}}"], "path": ["notification", "read", ":id"],
+              "variable": [{"key": "id", "value": "notification_id_here"}]},
+            "description": "AUTH: USER or ADMIN"
+          }
+        }
+      ]
+    },
+    {
+      "name": "💰 Wallet",
+      "description": "User loyalty coin wallet",
+      "item": [
+        {
+          "name": "Get My Wallet",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/wallet/my-wallet", "host": ["{{baseUrl}}"], "path": ["wallet", "my-wallet"]},
+            "description": "AUTH: USER or ADMIN"
+          }
+        },
+        {
+          "name": "[ADMIN] Get All Wallets",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/wallet", "host": ["{{baseUrl}}"], "path": ["wallet"]},
+            "description": "AUTH: ADMIN"
+          }
+        },
+        {
+          "name": "[ADMIN] Add Funds to Wallet",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"amount\": 50.00,\n  \"note\": \"Loyalty bonus\"\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/wallet/add-funds", "host": ["{{baseUrl}}"], "path": ["wallet", "add-funds"]},
+            "description": "AUTH: ADMIN"
+          }
+        }
+      ]
+    },
+    {
+      "name": "💾 Saved Cards",
+      "description": "Stripe saved payment cards",
+      "item": [
+        {
+          "name": "Save a Card",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stripePaymentMethodId\": \"pm_xxxxx\",\n  \"last4\": \"4242\",\n  \"brand\": \"visa\",\n  \"expMonth\": 12,\n  \"expYear\": 2027\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/saved-card", "host": ["{{baseUrl}}"], "path": ["saved-card"]},
+            "description": "AUTH: USER or ADMIN"
+          }
+        },
+        {
+          "name": "Get My Saved Cards",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/saved-card/my-cards", "host": ["{{baseUrl}}"], "path": ["saved-card", "my-cards"]},
+            "description": "AUTH: USER or ADMIN"
+          }
+        },
+        {
+          "name": "Get Card by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/saved-card/:id", "host": ["{{baseUrl}}"], "path": ["saved-card", ":id"],
+              "variable": [{"key": "id", "value": "card_id_here"}]},
+            "description": "AUTH: USER or ADMIN"
+          }
+        },
+        {
+          "name": "Delete Saved Card",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/saved-card/:id", "host": ["{{baseUrl}}"], "path": ["saved-card", ":id"],
+              "variable": [{"key": "id", "value": "card_id_here"}]},
+            "description": "AUTH: USER or ADMIN"
+          }
+        },
+        {
+          "name": "Update Card Status",
+          "request": {
+            "method": "PATCH",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isDefault\": true\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/saved-card/:id/status", "host": ["{{baseUrl}}"], "path": ["saved-card", ":id", "status"],
+              "variable": [{"key": "id", "value": "card_id_here"}]},
+            "description": "AUTH: USER or ADMIN"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🎫 Support Tickets",
+      "description": "Customer support ticket system",
+      "item": [
+        {
+          "name": "Create Support Ticket",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Wrong order received\",\n  \"description\": \"I ordered a hot latte but received an iced drink.\",\n  \"orderId\": \"{{orderId}}\"\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/support-ticket", "host": ["{{baseUrl}}"], "path": ["support-ticket"]},
+            "description": "AUTH: USER only"
+          }
+        },
+        {
+          "name": "[ADMIN] Get All Support Tickets",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/support-ticket?page=1&limit=20&status=OPEN",
+              "host": ["{{baseUrl}}"],
+              "path": ["support-ticket"],
+              "query": [
+                {"key": "page", "value": "1"},
+                {"key": "limit", "value": "20"},
+                {"key": "status", "value": "OPEN", "description": "OPEN | IN_PROGRESS | RESOLVED | CLOSED"}
+              ]
+            },
+            "description": "AUTH: ADMIN"
+          }
+        },
+        {
+          "name": "[ADMIN] Update Ticket Status",
+          "request": {
+            "method": "PATCH",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"RESOLVED\",\n  \"adminReply\": \"We've refunded your order. Sorry for the inconvenience!\"\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/support-ticket/:id/status", "host": ["{{baseUrl}}"], "path": ["support-ticket", ":id", "status"],
+              "variable": [{"key": "id", "value": "ticket_id_here"}]},
+            "description": "AUTH: ADMIN"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🥛 Product Options",
+      "description": "Product sizes, milk types, and extras (add-ons)",
+      "item": [
+        {
+          "name": "Get All Product Sizes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/product-size", "host": ["{{baseUrl}}"], "path": ["product-size"]}
+          }
+        },
+        {
+          "name": "[ADMIN] Create Product Size",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Large\",\n  \"priceAdjustment\": 1.00\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/product-size", "host": ["{{baseUrl}}"], "path": ["product-size"]},
+            "description": "AUTH: ADMIN"
+          }
+        },
+        {
+          "name": "Get All Milk Types",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/product-milk", "host": ["{{baseUrl}}"], "path": ["product-milk"]}
+          }
+        },
+        {
+          "name": "[ADMIN] Create Milk Type",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Oat Milk\",\n  \"priceAdjustment\": 0.75\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/product-milk", "host": ["{{baseUrl}}"], "path": ["product-milk"]},
+            "description": "AUTH: ADMIN"
+          }
+        },
+        {
+          "name": "Get All Extras",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/product-extra", "host": ["{{baseUrl}}"], "path": ["product-extra"]}
+          }
+        },
+        {
+          "name": "[ADMIN] Create Extra",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Extra Shot\",\n  \"price\": 0.90\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/product-extra", "host": ["{{baseUrl}}"], "path": ["product-extra"]},
+            "description": "AUTH: ADMIN"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🪙 Coin Products",
+      "description": "Loyalty coin-redeemable products",
+      "item": [
+        {
+          "name": "Get All Coin Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/coin-product", "host": ["{{baseUrl}}"], "path": ["coin-product"]},
+            "description": "Public"
+          }
+        },
+        {
+          "name": "[ADMIN] Create Coin Product",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Free Espresso Shot\",\n  \"coinCost\": 100,\n  \"description\": \"Redeem 100 coins for a free espresso shot\"\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/coin-product", "host": ["{{baseUrl}}"], "path": ["coin-product"]},
+            "description": "AUTH: ADMIN"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🌿 Ingredients & Inventory",
+      "description": "Ingredient stock management and stock movement tracking",
+      "item": [
+        {
+          "name": "Get All Ingredients",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/ingredient", "host": ["{{baseUrl}}"], "path": ["ingredient"]},
+            "description": "AUTH: ADMIN, BARISTA, or USER"
+          }
+        },
+        {
+          "name": "Get Ingredient by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/ingredient/:id", "host": ["{{baseUrl}}"], "path": ["ingredient", ":id"],
+              "variable": [{"key": "id", "value": "ingredient_id_here"}]},
+            "description": "AUTH: ADMIN, BARISTA, or USER"
+          }
+        },
+        {
+          "name": "Get Stock Movements",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ingredient/stock-movements?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["ingredient", "stock-movements"],
+              "query": [{"key": "page", "value": "1"}, {"key": "limit", "value": "20"}]
+            },
+            "description": "AUTH: ADMIN or BARISTA"
+          }
+        },
+        {
+          "name": "[ADMIN] Create Ingredient",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Espresso Beans — Ethiopia Yirgacheffe\",\n  \"unit\": \"grams\",\n  \"currentStock\": 2000,\n  \"lowStockThreshold\": 500,\n  \"costPerUnit\": 0.05\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/ingredient", "host": ["{{baseUrl}}"], "path": ["ingredient"]},
+            "description": "AUTH: ADMIN"
+          }
+        },
+        {
+          "name": "[ADMIN] Update Ingredient",
+          "request": {
+            "method": "PATCH",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Name\",\n  \"lowStockThreshold\": 300\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/ingredient/:id", "host": ["{{baseUrl}}"], "path": ["ingredient", ":id"],
+              "variable": [{"key": "id", "value": "ingredient_id_here"}]},
+            "description": "AUTH: ADMIN"
+          }
+        },
+        {
+          "name": "[ADMIN/BARISTA] Restock Ingredient",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 1000,\n  \"note\": \"Weekly restock from supplier\"\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/ingredient/:id/restock", "host": ["{{baseUrl}}"], "path": ["ingredient", ":id", "restock"],
+              "variable": [{"key": "id", "value": "ingredient_id_here"}]},
+            "description": "AUTH: ADMIN or BARISTA"
+          }
+        },
+        {
+          "name": "[ADMIN] Delete Ingredient",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/ingredient/:id", "host": ["{{baseUrl}}"], "path": ["ingredient", ":id"],
+              "variable": [{"key": "id", "value": "ingredient_id_here"}]},
+            "description": "AUTH: ADMIN"
+          }
+        }
+      ]
+    },
+    {
+      "name": "📋 Recipes",
+      "description": "Product ingredient recipes",
+      "item": [
+        {
+          "name": "Get All Recipes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/recipe", "host": ["{{baseUrl}}"], "path": ["recipe"]},
+            "description": "AUTH: ADMIN or BARISTA"
+          }
+        },
+        {
+          "name": "Get Product Recipe",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/recipe/{{productId}}", "host": ["{{baseUrl}}"], "path": ["recipe", "{{productId}}"]},
+            "description": "AUTH: ADMIN, BARISTA, or USER"
+          }
+        },
+        {
+          "name": "[ADMIN] Set Product Recipe",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"items\": [\n    {\"ingredientId\": \"ing_id_1\", \"quantity\": 18, \"unit\": \"grams\"},\n    {\"ingredientId\": \"ing_id_2\", \"quantity\": 240, \"unit\": \"ml\"}\n  ]\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/recipe/set", "host": ["{{baseUrl}}"], "path": ["recipe", "set"]},
+            "description": "AUTH: ADMIN. Creates or replaces the full recipe for a product."
+          }
+        },
+        {
+          "name": "[ADMIN] Add Recipe Item",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"ingredientId\": \"ing_id_here\",\n  \"quantity\": 30,\n  \"unit\": \"ml\"\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/recipe/item", "host": ["{{baseUrl}}"], "path": ["recipe", "item"]},
+            "description": "AUTH: ADMIN"
+          }
+        },
+        {
+          "name": "[ADMIN] Update Recipe Item",
+          "request": {
+            "method": "PATCH",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 25,\n  \"unit\": \"grams\"\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/recipe/item/:id", "host": ["{{baseUrl}}"], "path": ["recipe", "item", ":id"],
+              "variable": [{"key": "id", "value": "recipe_item_id_here"}]},
+            "description": "AUTH: ADMIN"
+          }
+        },
+        {
+          "name": "[ADMIN] Delete Recipe Item",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/recipe/item/:id", "host": ["{{baseUrl}}"], "path": ["recipe", "item", ":id"],
+              "variable": [{"key": "id", "value": "recipe_item_id_here"}]},
+            "description": "AUTH: ADMIN"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🧾 Invoices",
+      "description": "Order invoices and PDF generation",
+      "item": [
+        {
+          "name": "[ADMIN/BARISTA] Get All Invoices",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/invoice?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["invoice"],
+              "query": [{"key": "page", "value": "1"}, {"key": "limit", "value": "20"}]
+            },
+            "description": "AUTH: ADMIN or BARISTA"
+          }
+        },
+        {
+          "name": "Get Invoice by Order ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/invoice/{{orderId}}", "host": ["{{baseUrl}}"], "path": ["invoice", "{{orderId}}"]},
+            "description": "AUTH: ADMIN, BARISTA, or USER"
+          }
+        },
+        {
+          "name": "[ADMIN] Generate Invoice",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/invoice/generate/{{orderId}}", "host": ["{{baseUrl}}"], "path": ["invoice", "generate", "{{orderId}}"]},
+            "description": "AUTH: ADMIN. Generates invoice PDF for an order."
+          }
+        }
+      ]
+    },
+    {
+      "name": "⚙️ Config — Tax, Delivery Fee, Service Charge",
+      "description": "Store configuration: tax rates, delivery fees, service charges",
+      "item": [
+        {
+          "name": "Get Tax Config",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/tax", "host": ["{{baseUrl}}"], "path": ["tax"]}
+          }
+        },
+        {
+          "name": "[ADMIN] Create/Update Tax",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rate\": 0.08,\n  \"name\": \"Sales Tax\",\n  \"isActive\": true\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/tax", "host": ["{{baseUrl}}"], "path": ["tax"]},
+            "description": "AUTH: ADMIN"
+          }
+        },
+        {
+          "name": "Get Delivery Fee",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/delivery-fee", "host": ["{{baseUrl}}"], "path": ["delivery-fee"]}
+          }
+        },
+        {
+          "name": "[ADMIN] Create/Update Delivery Fee",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fee\": 2.99,\n  \"freeAbove\": 25.00,\n  \"isActive\": true\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/delivery-fee", "host": ["{{baseUrl}}"], "path": ["delivery-fee"]},
+            "description": "AUTH: ADMIN"
+          }
+        },
+        {
+          "name": "Get Service Charge",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/service-charge", "host": ["{{baseUrl}}"], "path": ["service-charge"]}
+          }
+        },
+        {
+          "name": "[ADMIN] Create/Update Service Charge",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rate\": 0.05,\n  \"name\": \"Service Charge\",\n  \"isActive\": true\n}"
+            },
+            "url": {"raw": "{{baseUrl}}/service-charge", "host": ["{{baseUrl}}"], "path": ["service-charge"]},
+            "description": "AUTH: ADMIN"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🤖 Automation",
+      "description": "Order processing automation status and retry",
+      "item": [
+        {
+          "name": "Get Order Automation Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/automation/{{orderId}}", "host": ["{{baseUrl}}"], "path": ["automation", "{{orderId}}"]},
+            "description": "AUTH: ADMIN, BARISTA, or USER. Returns queue job status for an order."
+          }
+        },
+        {
+          "name": "[ADMIN] Retry Order Automation",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/automation/retry/{{orderId}}", "host": ["{{baseUrl}}"], "path": ["automation", "retry", "{{orderId}}"]},
+            "description": "AUTH: ADMIN. Retries a failed automation job for an order."
+          }
+        }
+      ]
+    }
+  ]
+}

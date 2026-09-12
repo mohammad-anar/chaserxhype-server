@@ -4,11 +4,12 @@ import { StatusCodes } from "http-status-codes";
 import { paginationHelper } from "../../../helpers/paginationHelper.js";
 import Stripe from "stripe";
 import config from "../../../config/index.js";
+import { enqueueOrderAutomation } from "../../../queues/order.queue.js";
 
 const stripe = new Stripe(config.stripe.stripe_secret_key || "");
 
 const confirmPayment = async (sessionId: string) => {
-  return await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     // 1. Find the Payment record associated with the Stripe Session ID
     const paymentRecord = await tx.payment.findFirst({
       where: { gatewayPaymentId: sessionId },
@@ -141,6 +142,15 @@ const confirmPayment = async (sessionId: string) => {
       },
     });
   });
+
+  // Trigger BullMQ Order Automation post-transaction
+  if (result && result.id) {
+    enqueueOrderAutomation(result.id).catch((err) => {
+      console.error("Failed to enqueue order automation on payment confirmation:", err);
+    });
+  }
+
+  return result;
 };
 
 const getMyPayments = async (userId: string, options: any) => {

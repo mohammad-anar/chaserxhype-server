@@ -2,53 +2,40 @@ import app from "./app.js";
 import config from "./config/index.js";
 import { seedSuperAdmin } from "./db/seedSuperAdmin.js";
 import { initSocket } from "./helpers/socketHelper.js";
-
-if (config.node_env === "production") {
-  console.log = () => {};
-  console.info = () => {};
-  console.warn = () => {};
-  console.error = () => {};
-}
+import { initOrderWorker, closeOrderWorker } from "./queues/order.worker.js";
+import colors from "colors";
 
 let server: any;
 
 process.on("uncaughtException", (error) => {
-  console.error("Uncaught Exception detected. Shutting down...");
-  console.error(error);
-  process.exit(1);
+  console.error("Uncaught Exception detected:", error);
 });
 
 async function bootstrap() {
   try {
-    // seeding admin
-    await seedSuperAdmin();
-
     server = app.listen(config.port, () => {
-      console.log(`🚀 Server running on http://localhost:${config.port}`);
+      console.log(colors.green(`🚀 Server running on http://localhost:${config.port}`));
     });
 
     initSocket(server);
+    initOrderWorker();
+
+    // Seeding admin in background so server is not blocked if DB is connecting
+    seedSuperAdmin().catch((err) => {
+      console.warn(colors.yellow(`⚠️ Admin seeding warning: ${err.message}`));
+    });
   } catch (error) {
-    console.error("Error during server startup:", error);
-    process.exit(1);
+    console.error(colors.red("Error during server startup:"), error);
   }
 }
 
 process.on("unhandledRejection", (error) => {
-  console.error("Unhandled Rejection detected. Shutting down...");
-  console.error(error);
-
-  if (server) {
-    server.close(() => {
-      process.exit(1);
-    });
-  } else {
-    process.exit(1);
-  }
+  console.error("Unhandled Rejection detected:", error);
 });
 
-process.on("SIGTERM", () => {
+process.on("SIGTERM", async () => {
   console.log("SIGTERM received.");
+  await closeOrderWorker();
   if (server) {
     server.close(() => {
       process.exit(0);
@@ -56,8 +43,9 @@ process.on("SIGTERM", () => {
   }
 });
 
-process.on("SIGINT", () => {
+process.on("SIGINT", async () => {
   console.log("SIGINT received.");
+  await closeOrderWorker();
   if (server) {
     server.close(() => {
       process.exit(0);

@@ -31,7 +31,14 @@ const updateOrderStatusZodSchema = z.object({
   })
 });
 
+const addTipZodSchema = z.object({
+  amount: z.number({ message: "Tip amount must be a number" }).positive({ message: "Tip amount must be greater than 0" }),
+  message: z.string().optional(),
+  payType: z.enum(["CARD", "STRIPE", "PAYPAL", "APPLE_PAY", "GOOGLE_PAY"] as [string, ...string[]]).optional(),
+});
+
 export const OrderValidation = {
   checkoutZodSchema,
   updateOrderStatusZodSchema,
+  addTipZodSchema,
 };

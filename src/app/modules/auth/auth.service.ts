@@ -23,16 +23,20 @@ const JWT_SECRET = config.jwt.jwt_secret as Secret;
 
 
 const loginUser = async (payload: ILoginPayload) => {
-  const { email, password: inputPassword } = payload;
+  const email = payload.email?.trim();
+  const inputPassword = payload.password;
   if (!email || !inputPassword) {
     throw new ApiError(StatusCodes.BAD_REQUEST, "Email and password are required");
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email },
+  const user = await prisma.user.findFirst({
+    where: {
+      email: { equals: email, mode: "insensitive" },
+      isDeleted: false,
+    },
   });
 
-  if (!user || user.isDeleted) {
+  if (!user) {
     throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
   }
 
@@ -117,16 +121,19 @@ const changePassword = async (userId: string, payload: IChangePasswordPayload) =
 };
 
 const forgotPassword = async (payload: IForgotPasswordPayload) => {
-  const { email } = payload;
+  const email = payload.email?.trim();
   if (!email) {
     throw new ApiError(StatusCodes.BAD_REQUEST, "Email is required");
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email },
+  const user = await prisma.user.findFirst({
+    where: {
+      email: { equals: email, mode: "insensitive" },
+      isDeleted: false,
+    },
   });
 
-  if (!user || user.isDeleted) {
+  if (!user) {
     throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
   }
 
@@ -134,7 +141,7 @@ const forgotPassword = async (payload: IForgotPasswordPayload) => {
   const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
   await prisma.user.update({
-    where: { email },
+    where: { id: user.id },
     data: {
       otpCode,
       otpExpiresAt,
@@ -143,7 +150,7 @@ const forgotPassword = async (payload: IForgotPasswordPayload) => {
 
   try {
     const emailVal = emailTemplate.resetPassword({
-      email,
+      email: user.email,
       otp: Number(otpCode),
     });
     await emailHelper.sendEmail(emailVal);
@@ -151,19 +158,23 @@ const forgotPassword = async (payload: IForgotPasswordPayload) => {
     console.error("Failed to send reset password email:", error);
   }
 
-  console.log(`🔑 Reset Password OTP for ${email}: ${otpCode}`);
+  console.log(`🔑 Reset Password OTP for ${user.email}: ${otpCode}`);
 
   return { message: "OTP sent successfully to your email" };
 };
 
 const verifyEmail = async (payload: IVerifyOtpPayload) => {
-  const { email, otp } = payload;
+  const email = payload.email?.trim();
+  const otp = payload.otp;
   if (!email || !otp) {
     throw new ApiError(StatusCodes.BAD_REQUEST, "Email and OTP are required");
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email },
+  const user = await prisma.user.findFirst({
+    where: {
+      email: { equals: email, mode: "insensitive" },
+      isDeleted: false,
+    },
   });
 
   if (!user) {
@@ -187,7 +198,7 @@ const verifyEmail = async (payload: IVerifyOtpPayload) => {
   }
 
   const updatedUser = await prisma.user.update({
-    where: { email },
+    where: { id: user.id },
     data: {
       isVerified: true,
       otpCode: null,
@@ -201,16 +212,20 @@ const verifyEmail = async (payload: IVerifyOtpPayload) => {
 };
 
 const verifyOtp = async (payload: IVerifyOtpPayload) => {
-  const { email, otp } = payload;
+  const email = payload.email?.trim();
+  const otp = payload.otp;
   if (!email || !otp) {
     throw new ApiError(StatusCodes.BAD_REQUEST, "Email and OTP are required");
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email },
+  const user = await prisma.user.findFirst({
+    where: {
+      email: { equals: email, mode: "insensitive" },
+      isDeleted: false,
+    },
   });
 
-  if (!user || user.isDeleted) {
+  if (!user) {
     throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
   }
 
@@ -226,13 +241,10 @@ const verifyOtp = async (payload: IVerifyOtpPayload) => {
     throw new ApiError(StatusCodes.BAD_REQUEST, "Incorrect OTP code");
   }
 
-  const resetToken = jwtHelper.createToken({ email }, JWT_SECRET, "15m");
+  const resetToken = jwtHelper.createToken({ email: user.email }, JWT_SECRET, "15m");
 
   return { resetToken };
 };
-
-
-
 
 const resetPassword = async (payload: IResetPasswordPayload) => {
   const { password, newPassword } = payload;
@@ -251,16 +263,19 @@ const resetPassword = async (payload: IResetPasswordPayload) => {
     throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid or expired reset token");
   }
 
-  const email = decoded.email;
+  const email = decoded.email?.trim();
   if (!email) {
     throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid token payload");
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email },
+  const user = await prisma.user.findFirst({
+    where: {
+      email: { equals: email, mode: "insensitive" },
+      isDeleted: false,
+    },
   });
 
-  if (!user || user.isDeleted) {
+  if (!user) {
     throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
   }
 
@@ -275,7 +290,7 @@ const resetPassword = async (payload: IResetPasswordPayload) => {
   );
 
   await prisma.user.update({
-    where: { email },
+    where: { id: user.id },
     data: {
       password: hashedPassword,
       otpCode: null,
@@ -287,16 +302,19 @@ const resetPassword = async (payload: IResetPasswordPayload) => {
 };
 
 const resendOtp = async (payload: IResendOtpPayload) => {
-  const { email } = payload;
+  const email = payload.email?.trim();
   if (!email) {
     throw new ApiError(StatusCodes.BAD_REQUEST, "Email is required");
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email },
+  const user = await prisma.user.findFirst({
+    where: {
+      email: { equals: email, mode: "insensitive" },
+      isDeleted: false,
+    },
   });
 
-  if (!user || user.isDeleted) {
+  if (!user) {
     throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
   }
 
@@ -304,7 +322,7 @@ const resendOtp = async (payload: IResendOtpPayload) => {
   const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
   await prisma.user.update({
-    where: { email },
+    where: { id: user.id },
     data: {
       otpCode,
       otpExpiresAt,
@@ -322,7 +340,7 @@ const resendOtp = async (payload: IResendOtpPayload) => {
     console.error("Failed to resend email:", error);
   }
 
-  console.log(`🔑 Resent OTP for ${email}: ${otpCode}`);
+  console.log(`🔑 Resent OTP for ${user.email}: ${otpCode}`);
 
   return { message: "OTP code resent successfully" };
 };

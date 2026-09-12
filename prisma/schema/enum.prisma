@@ -1,6 +1,7 @@
 enum UserRole {
     USER
     ADMIN
+    BARISTA
 }
 
 enum UserStatus {
@@ -86,3 +87,32 @@ enum ServiceChargeStatus {
     ACTIVE
     INACTIVE
 }
+
+enum TemperatureType {
+    HOT
+    COLD
+    BOTH
+}
+
+enum StockMovementType {
+    IN
+    OUT
+    RESERVED
+    RELEASED
+    DEDUCTED
+    ADJUSTMENT
+}
+
+enum InvoiceStatus {
+    DRAFT
+    ISSUED
+    PAID
+    VOID
+}
+
+enum AutomationStatus {
+    PENDING
+    PROCESSING
+    COMPLETED
+    FAILED
+}

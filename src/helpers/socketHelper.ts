@@ -54,7 +54,7 @@ export const getIO = () => {
 };
 
 export interface IOrderNotificationPayload {
-  type: "ORDER_PLACED" | "ORDER_STATUS_CHANGED";
+  type: "ORDER_PLACED" | "ORDER_STATUS_CHANGED" | "TIP_RECEIVED";
   order: any;
   message: string;
 }
@@ -66,8 +66,8 @@ export const emitOrderNotification = async (payload: IOrderNotificationPayload) 
   };
 
   try {
-    // 1. Create DB notification for customer
-    if (payload.order?.userId) {
+    // 1. Create DB notification for customer or barista
+    if (payload.order?.userId && payload.type !== "TIP_RECEIVED") {
       await prisma.notification.create({
         data: {
           userId: payload.order.userId,
@@ -79,12 +79,25 @@ export const emitOrderNotification = async (payload: IOrderNotificationPayload) 
       });
     }
 
-    // 2. Create DB notification for admin
-    if (payload.type === "ORDER_PLACED") {
+    // 2. Create DB notification for Barista on TIP_RECEIVED
+    if (payload.type === "TIP_RECEIVED" && payload.order?.assignedBaristaId) {
+      await prisma.notification.create({
+        data: {
+          userId: payload.order.assignedBaristaId,
+          title: "🎉 Gratuity Tip Received!",
+          message: payload.message,
+          type: payload.type,
+          orderId: payload.order?.id || null,
+        },
+      });
+    }
+
+    // 3. Create DB notification for admin
+    if (payload.type === "ORDER_PLACED" || payload.type === "TIP_RECEIVED") {
       await prisma.notification.create({
         data: {
           userId: null,
-          title: "New Store Order Received",
+          title: payload.type === "ORDER_PLACED" ? "New Store Order Received" : "Order Tip Received",
           message: payload.message,
           type: payload.type,
           orderId: payload.order?.id || null,

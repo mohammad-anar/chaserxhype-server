@@ -12,6 +12,10 @@ model User {
     otpCode            String?
     otpExpiresAt       DateTime?
     needPasswordChange Boolean         @default(true)
+    isAvailable        Boolean         @default(true)
+    skillLevel         Int             @default(5)
+    activeOrderCount   Int             @default(0)
+    station            String?
     createdAt          DateTime        @default(now())
     updatedAt          DateTime        @updatedAt
     addresses          Address[]
@@ -20,9 +24,12 @@ model User {
     supportTickets     SupportTicket[]
     carts              Cart[]
     orders             Order[]
+    assignedOrders     Order[]         @relation("BaristaAssignedOrders")
     payments           Payment[]
     rewardPayments     RewardPayment[]
     notifications      Notification[]
+    tipsGiven          Tip[]           @relation("CustomerTips")
+    tipsReceived       Tip[]           @relation("BaristaTips")
 
     @@map("users")
 }
@@ -113,15 +120,25 @@ model Product {
     customOption     Boolean  @default(false)
     isDeleted        Boolean  @default(false)
 
-    createdAt     DateTime       @default(now())
-    updatedAt     DateTime       @updatedAt
-    productSizes  ProductSize[]
-    productMilks  ProductMilk[]
-    productExtras ProductExtra[]
-    cartItems     CartItem[]
-    orderItems    OrderItem[]
+    // Nutritional & Sensory Attributes for AI Recommendations
+    caffeineMg       Int?             @default(0)
+    sweetnessLevel   Int?             @default(3)
+    bitternessLevel  Int?             @default(3)
+    strengthLevel    Int?             @default(3)
+    temperatureType  TemperatureType  @default(HOT)
+    flavorProfile    String[]         @default([])
+    isAvailable      Boolean          @default(true)
 
-    coinProducts CoinProduct[]
+    createdAt                 DateTime                  @default(now())
+    updatedAt                 DateTime                  @updatedAt
+    productSizes              ProductSize[]
+    productMilks              ProductMilk[]
+    productExtras             ProductExtra[]
+    cartItems                 CartItem[]
+    orderItems                OrderItem[]
+    coinProducts              CoinProduct[]
+    productRecipes            ProductRecipe[]
+    moodRecommendationItems   MoodRecommendationItem[]
 }
 
 
@@ -275,12 +292,41 @@ model Order {
     total         Decimal?
     note          String?
 
+    tipAmount         Decimal?             @default(0)
+    tip               Tip?
+
     createdAt  DateTime    @default(now())
     updatedAt  DateTime    @updatedAt
     orderItems OrderItem[]
     payments   Payment[]
     rewardPayments RewardPayment[]
     shippingAddress ShippingAddress?
+
+    // Barista Assignment & Automation Relations
+    assignedBaristaId String?
+    assignedBarista   User?                @relation("BaristaAssignedOrders", fields: [assignedBaristaId], references: [id])
+    assignedAt        DateTime?
+    preparedAt        DateTime?
+    invoice           Invoice?
+    automationLogs    OrderAutomationLog[]
+    stockMovements    StockMovement[]
+}
+
+model Tip {
+    id        String   @id @default(cuid())
+    orderId   String   @unique
+    order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+    userId    String
+    user      User     @relation("CustomerTips", fields: [userId], references: [id])
+    baristaId String?
+    barista   User?    @relation("BaristaTips", fields: [baristaId], references: [id])
+    amount    Decimal
+    message   String?
+    payType   PayType? @default(CARD)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("tips")
 }
 
 model ShippingAddress {
@@ -440,4 +486,119 @@ model Notification {
 
     @@map("notifications")
 }
+
+model Ingredient {
+    id             String   @id @default(cuid())
+    name           String   @unique
+    unit           String   // e.g. "ml", "g", "shot", "piece"
+    currentStock   Decimal  @default(0)
+    reservedStock  Decimal  @default(0)
+    minStockLevel  Decimal  @default(0)
+    isAvailable    Boolean  @default(true)
+
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @updatedAt
+
+    recipes        ProductRecipe[]
+    stockMovements StockMovement[]
+
+    @@map("ingredients")
+}
+
+model ProductRecipe {
+    id           String     @id @default(cuid())
+    productId    String
+    product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+    ingredientId String
+    ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+    quantity     Decimal
+    unit         String
+
+    createdAt    DateTime   @default(now())
+    updatedAt    DateTime   @updatedAt
+
+    @@unique([productId, ingredientId])
+    @@map("product_recipes")
+}
+
+model StockMovement {
+    id           String            @id @default(cuid())
+    ingredientId String
+    ingredient   Ingredient        @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+    orderId      String?
+    order        Order?            @relation(fields: [orderId], references: [id], onDelete: SetNull)
+    quantity     Decimal
+    type         StockMovementType
+    reason       String?
+
+    createdAt    DateTime          @default(now())
+
+    @@map("stock_movements")
+}
+
+model Invoice {
+    id            String        @id @default(cuid())
+    orderId       String        @unique
+    order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+    invoiceNumber String        @unique
+    subTotal      Decimal
+    taxAmount     Decimal       @default(0)
+    discount      Decimal       @default(0)
+    deliveryFee   Decimal       @default(0)
+    serviceCharge Decimal       @default(0)
+    total         Decimal
+    status        InvoiceStatus @default(ISSUED)
+    issuedAt      DateTime      @default(now())
+    pdfUrl        String?
+
+    createdAt     DateTime      @default(now())
+    updatedAt     DateTime      @updatedAt
+
+    @@map("invoices")
+}
+
+model MoodRecommendation {
+    id          String                   @id @default(cuid())
+    userId      String?
+    mood        String
+    rawInput    String?
+    preferences Json?
+    createdAt   DateTime                 @default(now())
+
+    items       MoodRecommendationItem[]
+
+    @@map("mood_recommendations")
+}
+
+model MoodRecommendationItem {
+    id               String             @id @default(cuid())
+    recommendationId String
+    recommendation   MoodRecommendation @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
+    productId        String
+    product          Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+    score            Float
+    reason           String
+    rank             Int
+
+    createdAt        DateTime           @default(now())
+
+    @@map("mood_recommendation_items")
+}
+
+model OrderAutomationLog {
+    id          String           @id @default(cuid())
+    orderId     String
+    order       Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+    jobType     String
+    status      AutomationStatus @default(PENDING)
+    step        String
+    attempts    Int              @default(0)
+    error       String?
+    metadata    Json?
+    startedAt   DateTime         @default(now())
+    completedAt DateTime?
+
+    @@map("order_automation_logs")
+}
+
 

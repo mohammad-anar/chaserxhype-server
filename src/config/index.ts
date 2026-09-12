@@ -34,4 +34,22 @@ export default {
     stripe_secret_key: process.env.STRIPE_SECRET_KEY,
     stripe_webhook_secret: process.env.STRIPE_WEBHOOK_SECRET,
   },
+  redis: {
+    url: process.env.REDIS_URL || "",
+    host: process.env.REDIS_HOST || "127.0.0.1",
+    port: Number(process.env.REDIS_PORT) || 6379,
+    password: process.env.REDIS_PASSWORD || undefined,
+  },
+  ai: {
+    provider: process.env.AI_PROVIDER || "fallback", // 'openai' | 'gemini' | 'fallback'
+    model: process.env.AI_MODEL || (process.env.AI_PROVIDER === "openai" ? "gpt-4o-mini" : "gemini-2.5-flash"),
+    openai_api_key: process.env.OPENAI_API_KEY || "",
+    gemini_api_key: process.env.GEMINI_API_KEY || "",
+    timeout_ms: Number(process.env.AI_REQUEST_TIMEOUT) || 15000,
+    max_retries: Number(process.env.AI_MAX_RETRIES) || 2,
+  },
+  queue: {
+    concurrency: Number(process.env.QUEUE_CONCURRENCY) || 5,
+  },
 };
+

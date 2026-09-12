@@ -7,6 +7,9 @@ import { OrderStatus, Order, PayType } from "@prisma/client";
 import Stripe from "stripe";
 import config from "../../../config/index.js";
 import { emitOrderNotification } from "../../../helpers/socketHelper.js";
+import { enqueueOrderAutomation } from "../../../queues/order.queue.js";
+import { InventoryServices } from "../inventory/inventory.service.js";
+import { BaristaServices } from "../barista/barista.service.js";
 
 const stripe = new Stripe(config.stripe.stripe_secret_key || "");
 
@@ -86,12 +89,18 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
       finalNote = finalNote ? `${finalNote} | ${addrStr}` : addrStr;
     }
 
+    // 2. Deterministically find and assign the best available barista
+    const bestBarista = await BaristaServices.findBestAvailableBarista(tx);
+    const assignedBaristaId = bestBarista?.baristaId || null;
+
     const order = await tx.order.create({
       data: {
         orderNumber,
         userId,
         status: initialStatus,
         paymentStatus: initialPaymentStatus,
+        assignedBaristaId,
+        assignedAt: assignedBaristaId ? new Date() : null,
         subTotal: isCoinProduct ? 0 : cart.subTotal,
         discount: cart.discount,
         taxAmount: isCoinProduct ? 0 : cart.taxAmount,
@@ -105,6 +114,13 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
         note: finalNote,
       },
     });
+
+    if (assignedBaristaId) {
+      await tx.user.update({
+        where: { id: assignedBaristaId },
+        data: { activeOrderCount: { increment: 1 } },
+      });
+    }
 
     if (shippingAddressPayload) {
       await tx.shippingAddress.create({
@@ -415,6 +431,15 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
         payments: true,
         rewardPayments: true,
         shippingAddress: true,
+        assignedBarista: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            station: true,
+            skillLevel: true,
+          },
+        },
       },
     });
 
@@ -426,6 +451,13 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
       });
     } catch (e) {
       console.error("Socket notification error on checkout:", e);
+    }
+
+    // Trigger order automation immediately (creates invoice, reserves inventory, assigns barista, sends email)
+    if (resultOrder && resultOrder.id) {
+      enqueueOrderAutomation(resultOrder.id).catch((err) => {
+        console.error("Failed to enqueue order automation on checkout:", err);
+      });
     }
 
     return {
@@ -479,7 +511,7 @@ const getMyOrders = async (userId: string, options: any) => {
 const getOrderById = async (userId: string, role: string, orderId: string) => {
   const isId = !orderId.startsWith("ORD-");
   const whereClause: any = isId ? { id: orderId } : { orderNumber: orderId };
-  if (role !== "ADMIN") {
+  if (role !== "ADMIN" && role !== "BARISTA") {
     whereClause.userId = userId;
   }
 
@@ -500,6 +532,23 @@ const getOrderById = async (userId: string, role: string, orderId: string) => {
       payments: true,
       rewardPayments: true,
       shippingAddress: true,
+      assignedBarista: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          station: true,
+        },
+      },
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          profileImage: true,
+        },
+      },
     },
   });
 
@@ -508,6 +557,176 @@ const getOrderById = async (userId: string, role: string, orderId: string) => {
   }
 
   return result;
+};
+
+const getBaristaOrders = async (
+  baristaId: string,
+  options: {
+    status?: string;
+    view?: string;
+    searchTerm?: string;
+  }
+) => {
+  const { status, view = "all", searchTerm } = options;
+
+  const andConditions: any[] = [];
+
+  if (view === "assigned") {
+    andConditions.push({ assignedBaristaId: baristaId });
+    if (!status) {
+      andConditions.push({ status: { in: ["PENDING", "CONFIRMED", "PREPARING", "READY"] } });
+    }
+  } else if (view === "unassigned") {
+    andConditions.push({ assignedBaristaId: null });
+    andConditions.push({ status: { in: ["PENDING", "CONFIRMED"] } });
+  } else if (view === "completed") {
+    andConditions.push({ assignedBaristaId: baristaId });
+    andConditions.push({ status: "COMPLETED" });
+  } else {
+    andConditions.push({
+      OR: [
+        { assignedBaristaId: baristaId },
+        {
+          assignedBaristaId: null,
+          status: { in: ["PENDING", "CONFIRMED"] },
+        },
+      ],
+    });
+  }
+
+  if (status && String(status).toUpperCase() !== "ALL") {
+    let targetStatus = String(status).toUpperCase();
+    if (targetStatus === "CANCELLED") targetStatus = "CANCELED";
+    andConditions.push({ status: targetStatus as OrderStatus });
+  }
+
+  if (searchTerm && String(searchTerm).trim() !== "") {
+    const term = String(searchTerm).trim();
+    andConditions.push({
+      OR: [
+        { orderNumber: { contains: term, mode: "insensitive" } },
+        { user: { name: { contains: term, mode: "insensitive" } } },
+        { user: { email: { contains: term, mode: "insensitive" } } },
+        { shippingAddress: { fullName: { contains: term, mode: "insensitive" } } },
+      ],
+    });
+  }
+
+  const whereConditions = andConditions.length > 0 ? { AND: andConditions } : {};
+
+  const orders = await prisma.order.findMany({
+    where: whereConditions,
+    orderBy: {
+      createdAt: "desc",
+    },
+    include: {
+      orderItems: {
+        include: {
+          orderItemExtras: {
+            include: {
+              productExtra: true,
+            },
+          },
+          product: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+              temperatureType: true,
+              category: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
+          coinProduct: {
+            select: {
+              id: true,
+              name: true,
+              needPoint: true,
+              product: {
+                select: {
+                  image: true,
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          profileImage: true,
+        },
+      },
+      shippingAddress: true,
+      assignedBarista: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          station: true,
+        },
+      },
+      payments: true,
+    },
+  });
+
+  const unassignedCount = await prisma.order.count({
+    where: {
+      assignedBaristaId: null,
+      status: { in: ["PENDING", "CONFIRMED"] },
+    },
+  });
+
+  const myAssignedCount = await prisma.order.count({
+    where: {
+      assignedBaristaId: baristaId,
+      status: { in: ["PENDING", "CONFIRMED", "PREPARING", "READY"] },
+    },
+  });
+
+  const myPreparingCount = await prisma.order.count({
+    where: {
+      assignedBaristaId: baristaId,
+      status: "PREPARING",
+    },
+  });
+
+  const myReadyCount = await prisma.order.count({
+    where: {
+      assignedBaristaId: baristaId,
+      status: "READY",
+    },
+  });
+
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
+  const myCompletedTodayCount = await prisma.order.count({
+    where: {
+      assignedBaristaId: baristaId,
+      status: "COMPLETED",
+      updatedAt: { gte: startOfToday },
+    },
+  });
+
+  return {
+    meta: {
+      unassignedCount,
+      myAssignedCount,
+      myPreparingCount,
+      myReadyCount,
+      myCompletedTodayCount,
+      totalReturned: orders.length,
+    },
+    data: orders,
+  };
 };
 
 const getAllOrders = async (options: any) => {
@@ -554,6 +773,15 @@ const getAllOrders = async (options: any) => {
         },
       },
       shippingAddress: true,
+      assignedBarista: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          station: true,
+          isAvailable: true,
+        },
+      },
       orderItems: {
         include: {
           orderItemExtras: {
@@ -620,24 +848,48 @@ const updateOrderStatus = async (orderId: string, status: OrderStatus) => {
     throw new ApiError(StatusCodes.NOT_FOUND, "Order not found");
   }
 
-  const result = await prisma.order.update({
-    where: { id: orderId },
-    data: { status },
-    include: {
-      orderItems: {
-        include: {
-          orderItemExtras: {
-            include: {
-              productExtra: true,
-            },
-          },
-          product: true,
-          coinProduct: true,
-        },
+  const result = await prisma.$transaction(async (tx) => {
+    const updated = await tx.order.update({
+      where: { id: orderId },
+      data: {
+        status,
+        ...(status === "PREPARING" && !orderExists.preparedAt ? { preparedAt: new Date() } : {}),
       },
-      payments: true,
-      rewardPayments: true,
-    },
+      include: {
+        orderItems: {
+          include: {
+            orderItemExtras: {
+              include: {
+                productExtra: true,
+              },
+            },
+            product: true,
+            coinProduct: true,
+          },
+        },
+        payments: true,
+        rewardPayments: true,
+        assignedBarista: true,
+      },
+    });
+
+    // If order transitioned to COMPLETED -> Deduct stock and release barista workload
+    if (status === "COMPLETED") {
+      await InventoryServices.deductStock(orderId, tx);
+      if (orderExists.assignedBaristaId) {
+        await BaristaServices.releaseBaristaWorkload(orderExists.assignedBaristaId, tx);
+      }
+    }
+
+    // If order transitioned to CANCELED or FAILED -> Release stock and release barista workload
+    if (status === "CANCELED" || status === "FAILED") {
+      await InventoryServices.releaseStock(orderId, `Order status set to ${status}`, tx);
+      if (orderExists.assignedBaristaId) {
+        await BaristaServices.releaseBaristaWorkload(orderExists.assignedBaristaId, tx);
+      }
+    }
+
+    return updated;
   });
 
   try {
@@ -754,8 +1006,244 @@ const refundOrder = async (orderId: string) => {
       },
     });
 
+    // 5. Release any reserved stock and barista workload
+    await InventoryServices.releaseStock(order.id, "Order refunded", tx);
+    if (order.assignedBaristaId) {
+      await BaristaServices.releaseBaristaWorkload(order.assignedBaristaId, tx);
+    }
+
     return result;
   });
+};
+
+const addTipToOrder = async (
+  userId: string,
+  orderId: string,
+  payload: {
+    amount: number;
+    message?: string;
+    payType?: string;
+  }
+) => {
+  const isId = !orderId.startsWith("ORD-");
+  const order = await prisma.order.findFirst({
+    where: isId ? { id: orderId } : { orderNumber: orderId },
+    include: {
+      assignedBarista: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          station: true,
+        },
+      },
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+      tip: true,
+    },
+  });
+
+  if (!order) {
+    throw new ApiError(StatusCodes.NOT_FOUND, "Order not found");
+  }
+
+  const tipAmountNum = Number(payload.amount);
+  if (isNaN(tipAmountNum) || tipAmountNum <= 0) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, "Valid positive tip amount is required");
+  }
+
+  const result = await prisma.$transaction(async (tx) => {
+    let createdTip;
+    if (order.tip) {
+      createdTip = await tx.tip.update({
+        where: { id: order.tip.id },
+        data: {
+          amount: { increment: tipAmountNum },
+          message: payload.message || order.tip.message,
+          payType: (payload.payType as any) || order.tip.payType,
+        },
+        include: {
+          barista: {
+            select: { id: true, name: true, station: true },
+          },
+          user: {
+            select: { id: true, name: true, email: true },
+          },
+        },
+      });
+    } else {
+      createdTip = await tx.tip.create({
+        data: {
+          orderId: order.id,
+          userId: userId,
+          baristaId: order.assignedBaristaId || null,
+          amount: tipAmountNum,
+          message: payload.message || null,
+          payType: (payload.payType as any) || "CARD",
+        },
+        include: {
+          barista: {
+            select: { id: true, name: true, station: true },
+          },
+          user: {
+            select: { id: true, name: true, email: true },
+          },
+        },
+      });
+    }
+
+    await tx.order.update({
+      where: { id: order.id },
+      data: {
+        tipAmount: { increment: tipAmountNum },
+      },
+    });
+
+    return createdTip;
+  });
+
+  try {
+    emitOrderNotification({
+      type: "TIP_RECEIVED",
+      order: {
+        ...order,
+        tipAmount: Number(order.tipAmount || 0) + tipAmountNum,
+      },
+      message: `Received a $${tipAmountNum.toFixed(2)} tip for Order #${order.orderNumber}!`,
+    });
+  } catch (e) {
+    console.error("Socket error on tip:", e);
+  }
+
+  return result;
+};
+
+const getDailyTipsSummary = async (options?: { startDate?: string; endDate?: string }) => {
+  const andConditions: any[] = [];
+  if (options?.startDate) {
+    andConditions.push({ createdAt: { gte: new Date(options.startDate) } });
+  }
+  if (options?.endDate) {
+    const end = new Date(options.endDate);
+    end.setHours(23, 59, 59, 999);
+    andConditions.push({ createdAt: { lte: end } });
+  }
+
+  const where = andConditions.length > 0 ? { AND: andConditions } : {};
+
+  const allTips = await prisma.tip.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    include: {
+      order: {
+        select: {
+          id: true,
+          orderNumber: true,
+          total: true,
+          createdAt: true,
+        },
+      },
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          profileImage: true,
+        },
+      },
+      barista: {
+        select: {
+          id: true,
+          name: true,
+          station: true,
+          skillLevel: true,
+          profileImage: true,
+        },
+      },
+    },
+  });
+
+  const totalTips = allTips.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
+  const todayTips = allTips
+    .filter((t) => new Date(t.createdAt) >= startOfToday)
+    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+  const totalTippedOrders = allTips.length;
+  const avgTip = totalTippedOrders > 0 ? Number((totalTips / totalTippedOrders).toFixed(2)) : 0;
+
+  const dailyMap = new Map<string, { date: string; totalAmount: number; count: number }>();
+  allTips.forEach((tip) => {
+    const d = new Date(tip.createdAt).toISOString().split("T")[0];
+    const existing = dailyMap.get(d) || { date: d, totalAmount: 0, count: 0 };
+    existing.totalAmount += Number(tip.amount || 0);
+    existing.count += 1;
+    dailyMap.set(d, existing);
+  });
+
+  const dailyBreakdown = Array.from(dailyMap.values()).map((d) => ({
+    date: d.date,
+    totalAmount: Number(d.totalAmount.toFixed(2)),
+    count: d.count,
+    avgTip: Number((d.totalAmount / d.count).toFixed(2)),
+  }));
+  dailyBreakdown.sort((a, b) => b.date.localeCompare(a.date));
+
+  const baristaMap = new Map<
+    string,
+    {
+      baristaId: string;
+      name: string;
+      station: string;
+      totalTips: number;
+      count: number;
+    }
+  >();
+
+  allTips.forEach((tip) => {
+    const bId = tip.baristaId || "unassigned";
+    const bName = tip.barista?.name || "Unassigned / General Pool";
+    const bStation = tip.barista?.station || "Main Kitchen";
+    const existing = baristaMap.get(bId) || {
+      baristaId: bId,
+      name: bName,
+      station: bStation,
+      totalTips: 0,
+      count: 0,
+    };
+    existing.totalTips += Number(tip.amount || 0);
+    existing.count += 1;
+    baristaMap.set(bId, existing);
+  });
+
+  const baristaLeaderboard = Array.from(baristaMap.values()).map((b) => ({
+    baristaId: b.baristaId,
+    name: b.name,
+    station: b.station,
+    totalTips: Number(b.totalTips.toFixed(2)),
+    count: b.count,
+    avgTip: Number((b.totalTips / b.count).toFixed(2)),
+  }));
+  baristaLeaderboard.sort((a, b) => b.totalTips - a.totalTips);
+
+  return {
+    kpis: {
+      totalTips: Number(totalTips.toFixed(2)),
+      todayTips: Number(todayTips.toFixed(2)),
+      totalTippedOrders,
+      avgTip,
+    },
+    dailyBreakdown,
+    baristaLeaderboard,
+    recentTips: allTips.slice(0, 30),
+  };
 };
 
 export const OrderServices = {
@@ -763,6 +1251,9 @@ export const OrderServices = {
   getMyOrders,
   getOrderById,
   getAllOrders,
+  getBaristaOrders,
   updateOrderStatus,
   refundOrder,
+  addTipToOrder,
+  getDailyTipsSummary,
 };
