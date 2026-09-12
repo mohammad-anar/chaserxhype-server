@@ -238,6 +238,9 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
         taxAmount: cart.taxAmount,
       },
     };
+  }, {
+    maxWait: 20000,
+    timeout: 60000,
   });
 
   const { orderId, orderNumber, isCoinProduct, totalAmount, totalEarnedCoin, cartSnapshot } = txResult;

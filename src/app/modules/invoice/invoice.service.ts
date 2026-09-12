@@ -222,16 +222,20 @@ const generateInvoice = async (
 
     const isPaid = order.paymentStatus === "PAID";
 
-    const invoice = await tx.invoice.create({
-      data: {
+    const invoice = await tx.invoice.upsert({
+      where: { orderId },
+      update: {
+        status: isPaid ? "PAID" : undefined,
+      },
+      create: {
         orderId,
         invoiceNumber,
-        subTotal,
-        taxAmount,
-        discount,
-        deliveryFee,
-        serviceCharge,
-        total: calculatedTotal > 0 ? calculatedTotal : Number(order.total || 0),
+        subTotal: isNaN(subTotal) ? 0 : subTotal,
+        taxAmount: isNaN(taxAmount) ? 0 : taxAmount,
+        discount: isNaN(discount) ? 0 : discount,
+        deliveryFee: isNaN(deliveryFee) ? 0 : deliveryFee,
+        serviceCharge: isNaN(serviceCharge) ? 0 : serviceCharge,
+        total: !isNaN(calculatedTotal) && calculatedTotal > 0 ? calculatedTotal : (Number(order.total || 0) || 0),
         status: isPaid ? "PAID" : "ISSUED",
       },
       include: {
@@ -256,7 +260,10 @@ const generateInvoice = async (
 
   const invoice = txClient
     ? await runInTx(txClient)
-    : await prisma.$transaction(async (tx) => await runInTx(tx));
+    : await prisma.$transaction(async (tx) => await runInTx(tx), {
+        maxWait: 20000,
+        timeout: 60000,
+      });
 
   // Send email only when called standalone (without txClient).
   // When called with txClient, the caller must send the email AFTER the outer transaction commits

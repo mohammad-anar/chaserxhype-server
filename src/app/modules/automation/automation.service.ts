@@ -82,131 +82,126 @@ const processOrderAutomation = async (orderId: string): Promise<IAutomationResul
     },
   });
 
-  _newInvoiceForEmail = null;
+  // Calculate required ingredients outside the transaction to reduce tx duration
+  const requiredIngredients = await InventoryServices.calculateRequiredIngredients(
+    order.orderItems
+  );
+
+  if (requiredIngredients.length > 0) {
+    const availability = await InventoryServices.checkStockAvailability(requiredIngredients);
+    if (!availability.available) {
+      const missingDetails = availability.missingIngredients
+        .map(
+          (m) =>
+            `${m.name}: needed ${m.required}${m.unit}, available ${m.availableStock}${m.unit}`
+        )
+        .join("; ");
+
+      const errMsg = `Insufficient stock: ${missingDetails}`;
+
+      await prisma.order.update({
+        where: { id: orderId },
+        data: { status: "FAILED" },
+      });
+
+      await prisma.orderAutomationLog.update({
+        where: { id: log.id },
+        data: {
+          status: "FAILED",
+          step: "INVENTORY_CHECK",
+          error: errMsg,
+          completedAt: new Date(),
+        },
+      });
+
+      throw new Error(errMsg);
+    }
+  }
 
   try {
-    const result = await prisma.$transaction(async (tx) => {
-      // ==========================================
-      // STEP 1: CALCULATE & CHECK INVENTORY
-      // ==========================================
-      const requiredIngredients = await InventoryServices.calculateRequiredIngredients(
-        order.orderItems,
-        tx
-      );
-
-      if (requiredIngredients.length > 0) {
-        const availability = await InventoryServices.checkStockAvailability(
-          requiredIngredients,
-          tx
-        );
-
-        if (!availability.available) {
-          const missingDetails = availability.missingIngredients
-            .map(
-              (m) =>
-                `${m.name}: needed ${m.required}${m.unit}, available ${m.availableStock}${m.unit}`
-            )
-            .join("; ");
-
-          const errMsg = `Insufficient stock: ${missingDetails}`;
-
-          await tx.order.update({
-            where: { id: orderId },
-            data: { status: "FAILED" },
-          });
-
-          await tx.orderAutomationLog.update({
-            where: { id: log.id },
-            data: {
-              status: "FAILED",
-              step: "INVENTORY_CHECK",
-              error: errMsg,
-              completedAt: new Date(),
-            },
-          });
-
-          throw new Error(errMsg);
+    const result = await prisma.$transaction(
+      async (tx) => {
+        // ==========================================
+        // STEP 1 & 2: RESERVE INGREDIENTS
+        // ==========================================
+        if (requiredIngredients.length > 0) {
+          await InventoryServices.reserveStock(orderId, requiredIngredients, tx);
         }
 
         // ==========================================
-        // STEP 2: RESERVE INGREDIENTS
+        // STEP 3: ASSIGN BARISTA
+        // Only assign if checkout didn't already assign one (avoids redundant tx work)
         // ==========================================
-        await InventoryServices.reserveStock(orderId, requiredIngredients, tx);
-      }
+        let baristaAssignment: any;
+        if (order.assignedBaristaId) {
+          baristaAssignment = {
+            assigned: true,
+            alreadyAssigned: true,
+            baristaId: order.assignedBaristaId,
+            baristaName: order.assignedBarista?.name,
+          };
+        } else {
+          baristaAssignment = await BaristaServices.assignBaristaToOrder(
+            orderId,
+            undefined,
+            tx
+          );
+        }
 
-      // ==========================================
-      // STEP 3: ASSIGN BARISTA
-      // Only assign if checkout didn't already assign one (avoids redundant tx work)
-      // ==========================================
-      let baristaAssignment: any;
-      if (order.assignedBaristaId) {
-        baristaAssignment = {
-          assigned: true,
-          alreadyAssigned: true,
-          baristaId: order.assignedBaristaId,
-          baristaName: order.assignedBarista?.name,
-        };
-      } else {
-        baristaAssignment = await BaristaServices.assignBaristaToOrder(
-          orderId,
-          undefined,
-          tx
-        );
-      }
-
-      // ==========================================
-      // STEP 4: GENERATE INVOICE
-      // Note: sendInvoiceEmail is called AFTER this $transaction commits (see below)
-      // ==========================================
-      const existingInvoice = await tx.invoice.findUnique({ where: { orderId } });
-      let invoice: any;
-      if (existingInvoice) {
-        invoice = existingInvoice;
-      } else {
-        invoice = await InvoiceServices.generateInvoice(orderId, tx);
-        // Mark for email dispatch after outer transaction commits
+        // ==========================================
+        // STEP 4: GENERATE INVOICE
+        // Note: sendInvoiceEmail is called AFTER this $transaction commits (see below)
+        // ==========================================
+        const invoice = await InvoiceServices.generateInvoice(orderId, tx);
         _newInvoiceForEmail = invoice;
-      }
 
-      // ==========================================
-      // STEP 5: UPDATE ORDER STATUS
-      // ==========================================
-      const updatedOrder = await tx.order.update({
-        where: { id: orderId },
-        data: {
-          status: "PREPARING",
-          paymentStatus: order.paymentStatus === "PENDING" && order.paymentMethod === "REWARD_COINS" ? "PAID" : order.paymentStatus,
-        },
-        include: {
-          user: true,
-          orderItems: { include: { product: true } },
-          assignedBarista: true,
-        },
-      });
-
-      // Update log to COMPLETED
-      await tx.orderAutomationLog.update({
-        where: { id: log.id },
-        data: {
-          status: "COMPLETED",
-          step: "ORDER_PREPARING",
-          completedAt: new Date(),
-          metadata: {
-            assignedBaristaId: baristaAssignment.baristaId,
-            baristaName: baristaAssignment.baristaName,
-            invoiceNumber: invoice.invoiceNumber,
-            reservedIngredientsCount: requiredIngredients.length,
+        // ==========================================
+        // STEP 5: UPDATE ORDER STATUS
+        // ==========================================
+        const updatedOrder = await tx.order.update({
+          where: { id: orderId },
+          data: {
+            status: "PREPARING",
+            paymentStatus:
+              order.paymentStatus === "PENDING" && order.paymentMethod === "REWARD_COINS"
+                ? "PAID"
+                : order.paymentStatus,
           },
-        },
-      });
+          include: {
+            user: true,
+            orderItems: { include: { product: true } },
+            assignedBarista: true,
+          },
+        });
 
-      return {
-        order: updatedOrder,
-        baristaAssignment,
-        invoice,
-        requiredIngredients,
-      };
-    });
+        // Update log to COMPLETED
+        await tx.orderAutomationLog.update({
+          where: { id: log.id },
+          data: {
+            status: "COMPLETED",
+            step: "ORDER_PREPARING",
+            completedAt: new Date(),
+            metadata: {
+              assignedBaristaId: baristaAssignment.baristaId,
+              baristaName: baristaAssignment.baristaName,
+              invoiceNumber: invoice.invoiceNumber,
+              reservedIngredientsCount: requiredIngredients.length,
+            },
+          },
+        });
+
+        return {
+          order: updatedOrder,
+          baristaAssignment,
+          invoice,
+          requiredIngredients,
+        };
+      },
+      {
+        maxWait: 20000,
+        timeout: 60000,
+      }
+    );
 
     // ==========================================
     // STEP 6: NOTIFY + SEND INVOICE EMAIL (Post-Transaction — safe to do after commit)

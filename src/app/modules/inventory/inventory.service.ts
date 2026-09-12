@@ -183,7 +183,7 @@ const reserveStock = async (
   } else {
     return await prisma.$transaction(async (tx) => {
       return await runInTx(tx);
-    });
+    }, { maxWait: 20000, timeout: 60000 });
   }
 };
 
@@ -278,7 +278,7 @@ const deductStock = async (
   } else {
     return await prisma.$transaction(async (tx) => {
       return await runInTx(tx);
-    });
+    }, { maxWait: 20000, timeout: 60000 });
   }
 };
 
@@ -341,7 +341,7 @@ const releaseStock = async (
   } else {
     return await prisma.$transaction(async (tx) => {
       return await runInTx(tx);
-    });
+    }, { maxWait: 20000, timeout: 60000 });
   }
 };
 
