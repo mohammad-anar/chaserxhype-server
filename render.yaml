@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: chaserxhype-server
+    runtime: node
+    plan: free
+    buildCommand: pnpm install && pnpm run build
+    startCommand: node dist/server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
