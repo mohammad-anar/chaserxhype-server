@@ -14,7 +14,8 @@ import { BaristaServices } from "../barista/barista.service.js";
 const stripe = new Stripe(config.stripe.stripe_secret_key || "");
 
 const checkout = async (userId: string, payload: ICheckoutPayload) => {
-  return await prisma.$transaction(async (tx) => {
+  // 1. Run atomic DB operations (Order creation, items, coin deduction, cart clearing)
+  const txResult = await prisma.$transaction(async (tx) => {
     // 1. Fetch user cart with items and extras
     const cart = await tx.cart.findFirst({
       where: { userId },
@@ -49,9 +50,6 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
 
     const totalAmount = Number(cart.total || 0);
 
-    // 2. Create the Order record
-    // If it's a coin product, the payment is processed immediately inside this transaction.
-    // If it's a normal product, the payment starts as PENDING until Stripe checkout completes.
     const initialStatus = (isCoinProduct && totalAmount <= 0) ? "CONFIRMED" : "PENDING";
     const initialPaymentStatus = (isCoinProduct && totalAmount <= 0) ? "PAID" : "PENDING";
 
@@ -89,7 +87,7 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
       finalNote = finalNote ? `${finalNote} | ${addrStr}` : addrStr;
     }
 
-    // 2. Deterministically find and assign the best available barista
+    // Deterministically find and assign the best available barista
     const bestBarista = await BaristaServices.findBestAvailableBarista(tx);
     const assignedBaristaId = bestBarista?.baristaId || null;
 
@@ -137,7 +135,7 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
       });
     }
 
-    // 3. Create OrderItems and OrderItemExtras
+    // Create OrderItems and OrderItemExtras
     for (const item of cart.cartItems) {
       const orderItem = await tx.orderItem.create({
         data: {
@@ -164,9 +162,6 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
         });
       }
     }
-
-    // 4. Process payment and update Wallet balance / Stripe Session
-    let paymentUrl = null;
 
     if (isCoinProduct) {
       // Reward payment flow
@@ -207,192 +202,9 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
           paidAt: new Date(),
         },
       });
-
-      // Generate transactionId
-      const transactionId = `TXN-PENDING-${Date.now()}-${Math.floor(100000 + Math.random() * 900000)}`;
-
-      // If totalAmount > 0, generate Stripe session for delivery fee/service charge
-      if (totalAmount > 0) {
-        const frontendUrl = config.frontend_url || "http://localhost:3000";
-        const feeLineItems = [];
-
-        if (Number(cart.deliveryFee || 0) > 0) {
-          feeLineItems.push({
-            price_data: {
-              currency: "usd",
-              product_data: {
-                name: "Delivery Fee",
-                description: `Delivery fee for Order #${orderNumber}`,
-              },
-              unit_amount: Math.round(Number(cart.deliveryFee) * 100),
-            },
-            quantity: 1,
-          });
-        }
-
-        if (Number(cart.serviceCharge || 0) > 0) {
-          feeLineItems.push({
-            price_data: {
-              currency: "usd",
-              product_data: {
-                name: "Service Charge",
-                description: `Service charge for Order #${orderNumber}`,
-              },
-              unit_amount: Math.round(Number(cart.serviceCharge) * 100),
-            },
-            quantity: 1,
-          });
-        }
-
-        if (Number(cart.taxAmount || 0) > 0) {
-          feeLineItems.push({
-            price_data: {
-              currency: "usd",
-              product_data: {
-                name: "Tax",
-                description: `Tax amount for Order #${orderNumber}`,
-              },
-              unit_amount: Math.round(Number(cart.taxAmount) * 100),
-            },
-            quantity: 1,
-          });
-        }
-
-        if (feeLineItems.length === 0) {
-          feeLineItems.push({
-            price_data: {
-              currency: "usd",
-              product_data: {
-                name: `Order Fee #${orderNumber}`,
-                description: `Payment for Order #${orderNumber} fees`,
-              },
-              unit_amount: Math.round(totalAmount * 100),
-            },
-            quantity: 1,
-          });
-        }
-
-        const session = await stripe.checkout.sessions.create({
-          line_items: feeLineItems,
-          mode: "payment",
-          success_url: `${frontendUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}&order_number=${order.orderNumber}&transaction_id=${transactionId}`,
-          cancel_url: `${frontendUrl}/payment/cancel?order_number=${order.orderNumber}&transaction_id=${transactionId}`,
-          metadata: {
-            orderId: order.id,
-            userId: userId,
-            totalEarnedCoin: "0",
-          },
-        });
-
-        paymentUrl = session.url;
-
-        // Create pending Payment record for the monetary fees
-        await tx.payment.create({
-          data: {
-            orderId: order.id,
-            userId,
-            paymentMethod: payload.payType || "CARD",
-            status: "PENDING",
-            amount: totalAmount,
-            currency: "USD",
-            transactionId,
-            gatewayPaymentId: session.id,
-          },
-        });
-      }
-    } else {
-      // Money payment flow using Stripe Checkout Session
-      const frontendUrl = config.frontend_url || "http://localhost:3000";
-      const transactionId = `TXN-PENDING-${Date.now()}-${Math.floor(100000 + Math.random() * 900000)}`;
-
-      const lineItems = cart.cartItems.map((item) => {
-        const itemTotalPrice = Number(item.totalPrice || 0);
-        const unitAmount = Math.round((itemTotalPrice / item.quantity) * 100);
-        return {
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: item.product?.name || "Product",
-              description: `Payment for item in Order #${orderNumber}`,
-            },
-            unit_amount: unitAmount,
-          },
-          quantity: item.quantity,
-        };
-      });
-
-      if (Number(cart.deliveryFee || 0) > 0) {
-        lineItems.push({
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: "Delivery Fee",
-              description: `Delivery fee for Order #${orderNumber}`,
-            },
-            unit_amount: Math.round(Number(cart.deliveryFee) * 100),
-          },
-          quantity: 1,
-        });
-      }
-
-      if (Number(cart.serviceCharge || 0) > 0) {
-        lineItems.push({
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: "Service Charge",
-              description: `Service charge for Order #${orderNumber}`,
-            },
-            unit_amount: Math.round(Number(cart.serviceCharge) * 100),
-          },
-          quantity: 1,
-        });
-      }
-
-      if (Number(cart.taxAmount || 0) > 0) {
-        lineItems.push({
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: "Tax",
-              description: `Tax amount for Order #${orderNumber}`,
-            },
-            unit_amount: Math.round(Number(cart.taxAmount) * 100),
-          },
-          quantity: 1,
-        });
-      }
-
-      const session = await stripe.checkout.sessions.create({
-        line_items: lineItems,
-        mode: "payment",
-        success_url: `${frontendUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}&order_number=${order.orderNumber}&transaction_id=${transactionId}`,
-        cancel_url: `${frontendUrl}/payment/cancel?order_number=${order.orderNumber}&transaction_id=${transactionId}`,
-        metadata: {
-          orderId: order.id,
-          userId: userId,
-          totalEarnedCoin: String(totalEarnedCoin),
-        },
-      });
-
-      paymentUrl = session.url;
-
-      // Create pending Payment record
-      await tx.payment.create({
-        data: {
-          orderId: order.id,
-          userId,
-          paymentMethod: payload.payType || "CARD",
-          status: "PENDING",
-          amount: totalAmount,
-          currency: "USD",
-          transactionId,
-          gatewayPaymentId: session.id,
-        },
-      });
     }
 
-    // 5. Clear user cart items
+    // Clear user cart items
     const itemIds = cart.cartItems.map((item) => item.id);
     await tx.cartItemExtra.deleteMany({
       where: { cartItemId: { in: itemIds } },
@@ -413,58 +225,257 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
       },
     });
 
-    // Return the created order with payment links and detail representation
-    const resultOrder = await tx.order.findUnique({
-      where: { id: order.id },
-      include: {
-        orderItems: {
-          include: {
-            orderItemExtras: {
-              include: {
-                productExtra: true,
-              },
+    return {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      isCoinProduct,
+      totalAmount,
+      totalEarnedCoin,
+      cartSnapshot: {
+        cartItems: cart.cartItems,
+        deliveryFee: cart.deliveryFee,
+        serviceCharge: cart.serviceCharge,
+        taxAmount: cart.taxAmount,
+      },
+    };
+  });
+
+  const { orderId, orderNumber, isCoinProduct, totalAmount, totalEarnedCoin, cartSnapshot } = txResult;
+  let paymentUrl: string | null = null;
+  const transactionId = `TXN-PENDING-${Date.now()}-${Math.floor(100000 + Math.random() * 900000)}`;
+  const frontendUrl = config.frontend_url || "http://localhost:3000";
+
+  // 2. Handle Stripe Checkout outside DB transaction
+  if (isCoinProduct) {
+    if (totalAmount > 0) {
+      const feeLineItems = [];
+
+      if (Number(cartSnapshot.deliveryFee || 0) > 0) {
+        feeLineItems.push({
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: "Delivery Fee",
+              description: `Delivery fee for Order #${orderNumber}`,
             },
-            product: true,
-            coinProduct: true,
+            unit_amount: Math.round(Number(cartSnapshot.deliveryFee) * 100),
           },
-        },
-        payments: true,
-        rewardPayments: true,
-        shippingAddress: true,
-        assignedBarista: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            station: true,
-            skillLevel: true,
+          quantity: 1,
+        });
+      }
+
+      if (Number(cartSnapshot.serviceCharge || 0) > 0) {
+        feeLineItems.push({
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: "Service Charge",
+              description: `Service charge for Order #${orderNumber}`,
+            },
+            unit_amount: Math.round(Number(cartSnapshot.serviceCharge) * 100),
           },
+          quantity: 1,
+        });
+      }
+
+      if (Number(cartSnapshot.taxAmount || 0) > 0) {
+        feeLineItems.push({
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: "Tax",
+              description: `Tax amount for Order #${orderNumber}`,
+            },
+            unit_amount: Math.round(Number(cartSnapshot.taxAmount) * 100),
+          },
+          quantity: 1,
+        });
+      }
+
+      if (feeLineItems.length === 0) {
+        feeLineItems.push({
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: `Order Fee #${orderNumber}`,
+              description: `Payment for Order #${orderNumber} fees`,
+            },
+            unit_amount: Math.round(totalAmount * 100),
+          },
+          quantity: 1,
+        });
+      }
+
+      const session = await stripe.checkout.sessions.create({
+        line_items: feeLineItems,
+        mode: "payment",
+        success_url: `${frontendUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}&order_number=${orderNumber}&transaction_id=${transactionId}`,
+        cancel_url: `${frontendUrl}/payment/cancel?order_number=${orderNumber}&transaction_id=${transactionId}`,
+        metadata: {
+          orderId,
+          userId,
+          totalEarnedCoin: "0",
         },
+      });
+
+      paymentUrl = session.url;
+
+      await prisma.payment.create({
+        data: {
+          orderId,
+          userId,
+          paymentMethod: payload.payType || "CARD",
+          status: "PENDING",
+          amount: totalAmount,
+          currency: "USD",
+          transactionId,
+          gatewayPaymentId: session.id,
+        },
+      });
+    }
+  } else {
+    // Money payment flow using Stripe Checkout Session
+    const lineItems = cartSnapshot.cartItems.map((item) => {
+      const itemTotalPrice = Number(item.totalPrice || 0);
+      const unitAmount = Math.max(50, Math.round((itemTotalPrice / (item.quantity || 1)) * 100));
+      return {
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: item.product?.name || "Product",
+            description: `Payment for item in Order #${orderNumber}`,
+          },
+          unit_amount: unitAmount,
+        },
+        quantity: item.quantity,
+      };
+    });
+
+    if (Number(cartSnapshot.deliveryFee || 0) > 0) {
+      lineItems.push({
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: "Delivery Fee",
+            description: `Delivery fee for Order #${orderNumber}`,
+          },
+          unit_amount: Math.round(Number(cartSnapshot.deliveryFee) * 100),
+        },
+        quantity: 1,
+      });
+    }
+
+    if (Number(cartSnapshot.serviceCharge || 0) > 0) {
+      lineItems.push({
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: "Service Charge",
+            description: `Service charge for Order #${orderNumber}`,
+          },
+          unit_amount: Math.round(Number(cartSnapshot.serviceCharge) * 100),
+        },
+        quantity: 1,
+      });
+    }
+
+    if (Number(cartSnapshot.taxAmount || 0) > 0) {
+      lineItems.push({
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: "Tax",
+            description: `Tax amount for Order #${orderNumber}`,
+          },
+          unit_amount: Math.round(Number(cartSnapshot.taxAmount) * 100),
+        },
+        quantity: 1,
+      });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      line_items: lineItems,
+      mode: "payment",
+      success_url: `${frontendUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}&order_number=${orderNumber}&transaction_id=${transactionId}`,
+      cancel_url: `${frontendUrl}/payment/cancel?order_number=${orderNumber}&transaction_id=${transactionId}`,
+      metadata: {
+        orderId,
+        userId,
+        totalEarnedCoin: String(totalEarnedCoin),
       },
     });
 
-    try {
-      emitOrderNotification({
-        type: "ORDER_PLACED",
-        order: resultOrder,
-        message: `New Order #${resultOrder?.orderNumber || ''} placed!`,
-      });
-    } catch (e) {
-      console.error("Socket notification error on checkout:", e);
-    }
+    paymentUrl = session.url;
 
-    // Trigger order automation immediately (creates invoice, reserves inventory, assigns barista, sends email)
-    if (resultOrder && resultOrder.id) {
-      enqueueOrderAutomation(resultOrder.id).catch((err) => {
-        console.error("Failed to enqueue order automation on checkout:", err);
-      });
-    }
+    await prisma.payment.create({
+      data: {
+        orderId,
+        userId,
+        paymentMethod: payload.payType || "CARD",
+        status: "PENDING",
+        amount: totalAmount,
+        currency: "USD",
+        transactionId,
+        gatewayPaymentId: session.id,
+      },
+    });
+  }
 
-    return {
-      order: resultOrder,
-      paymentUrl,
-    };
+  // 3. Return full order object with associations
+  const resultOrder = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      orderItems: {
+        include: {
+          orderItemExtras: {
+            include: {
+              productExtra: true,
+            },
+          },
+          product: {
+            include: {
+              category: true,
+            },
+          },
+          coinProduct: true,
+        },
+      },
+      payments: true,
+      rewardPayments: true,
+      shippingAddress: true,
+      assignedBarista: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          station: true,
+          skillLevel: true,
+        },
+      },
+    },
   });
+
+  try {
+    emitOrderNotification({
+      type: "ORDER_PLACED",
+      order: resultOrder,
+      message: `New Order #${resultOrder?.orderNumber || ""} placed!`,
+    });
+  } catch (e) {
+    console.error("Socket notification error on checkout:", e);
+  }
+
+  // Trigger order automation immediately (creates invoice, reserves inventory, assigns barista, sends email)
+  if (resultOrder && resultOrder.id) {
+    enqueueOrderAutomation(resultOrder.id).catch((err) => {
+      console.error("Failed to enqueue order automation on checkout:", err);
+    });
+  }
+
+  return {
+    order: resultOrder,
+    paymentUrl,
+  };
 };
 
 const getMyOrders = async (userId: string, options: any) => {
