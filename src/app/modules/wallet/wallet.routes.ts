@@ -25,5 +25,17 @@ router.post(
   WalletController.addFunds
 );
 
+router.post(
+  "/claim-daily-drop",
+  auth("USER", "ADMIN"),
+  WalletController.claimDailyDrop
+);
+
+router.post(
+  "/claim-free-pour",
+  auth("USER", "ADMIN"),
+  WalletController.claimFreePour
+);
+
 export const WalletRouter = router;
 

@@ -42,9 +42,35 @@ const addFunds = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const claimDailyDrop = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.user.id;
+  const result = await WalletServices.claimDailyDrop(userId);
+
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: result.message,
+    data: result,
+  });
+});
+
+const claimFreePour = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.user.id;
+  const result = await WalletServices.claimFreePour(userId);
+
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: result.message,
+    data: result,
+  });
+});
+
 export const WalletController = {
   getMyWallet,
   getAllWallets,
   addFunds,
+  claimDailyDrop,
+  claimFreePour,
 };
 
