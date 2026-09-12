@@ -4,6 +4,7 @@ import ApiError from "../../../errors/ApiError.js";
 import { StatusCodes } from "http-status-codes";
 import bcrypt from "bcryptjs";
 import { IBaristaScoreResult, IUpdateBaristaProfilePayload } from "./barista.interface.js";
+import { emitOrderNotification } from "../../../helpers/socketHelper.js";
 
 /**
  * Calculates a deterministic score for a barista candidate.
@@ -91,43 +92,120 @@ const findBestAvailableBarista = async (
 };
 
 /**
- * Assigns the best barista to an order atomically.
- * Idempotent: If order already has a barista assigned, returns existing assignment.
+ * Assigns, reassigns, or unassigns a barista to an order atomically.
+ * Supports manual preferredBaristaId (including switching baristas and unassigning with null/'unassign'),
+ * as well as automated deterministic scoring fallback.
  */
 const assignBaristaToOrder = async (
   orderId: string,
-  preferredBaristaId?: string,
+  preferredBaristaId?: string | null,
   txClient?: Prisma.TransactionClient
 ) => {
+  const isUnassign =
+    preferredBaristaId === null ||
+    preferredBaristaId === "" ||
+    preferredBaristaId === "unassign";
+
   const runInTx = async (tx: Prisma.TransactionClient) => {
     const order = await tx.order.findUnique({
       where: { id: orderId },
-      include: { assignedBarista: true },
+      include: { assignedBarista: true, user: true },
     });
 
     if (!order) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Order not found");
     }
 
-    if (order.assignedBaristaId) {
+    // Case 1: Unassign barista
+    if (isUnassign) {
+      if (order.assignedBaristaId) {
+        // Decrement active order count on the previous barista (safely)
+        await tx.user.update({
+          where: { id: order.assignedBaristaId },
+          data: {
+            activeOrderCount: {
+              decrement: 1,
+            },
+          },
+        });
+
+        const updatedOrder = await tx.order.update({
+          where: { id: orderId },
+          data: {
+            assignedBaristaId: null,
+            assignedAt: null,
+          },
+          include: {
+            user: true,
+            assignedBarista: true,
+            orderItems: { include: { product: true } },
+          },
+        });
+
+        return {
+          assigned: false,
+          unassigned: true,
+          baristaId: null,
+          baristaName: null,
+          message: "Barista unassigned from order",
+          order: updatedOrder,
+        };
+      }
+
       return {
-        assigned: true,
-        baristaId: order.assignedBaristaId,
-        baristaName: order.assignedBarista?.name,
-        alreadyAssigned: true,
+        assigned: false,
+        unassigned: true,
+        baristaId: null,
+        baristaName: null,
+        message: "Order has no assigned barista",
+        order,
       };
     }
 
     let targetBaristaId = preferredBaristaId;
     let targetBaristaName: string | undefined;
 
+    // Case 2: Manual assignment with a specified preferredBaristaId
     if (targetBaristaId) {
+      if (order.assignedBaristaId === targetBaristaId) {
+        return {
+          assigned: true,
+          baristaId: targetBaristaId,
+          baristaName: order.assignedBarista?.name,
+          alreadyAssigned: true,
+          order,
+        };
+      }
+
       const barista = await tx.user.findUnique({ where: { id: targetBaristaId } });
       if (!barista) {
         throw new ApiError(StatusCodes.NOT_FOUND, "Selected barista does not exist");
       }
       targetBaristaName = barista.name;
+
+      // If switching from a different barista, decrement previous barista's active count
+      if (order.assignedBaristaId && order.assignedBaristaId !== targetBaristaId) {
+        await tx.user.update({
+          where: { id: order.assignedBaristaId },
+          data: {
+            activeOrderCount: {
+              decrement: 1,
+            },
+          },
+        });
+      }
     } else {
+      // Case 3: Automated assignment
+      if (order.assignedBaristaId) {
+        return {
+          assigned: true,
+          baristaId: order.assignedBaristaId,
+          baristaName: order.assignedBarista?.name,
+          alreadyAssigned: true,
+          order,
+        };
+      }
+
       const bestCandidate = await findBestAvailableBarista(tx);
       if (bestCandidate) {
         targetBaristaId = bestCandidate.baristaId;
@@ -139,16 +217,28 @@ const assignBaristaToOrder = async (
       return {
         assigned: false,
         message: "No barista currently available. Order queued for manual assignment.",
+        order,
       };
     }
 
     // Atomically assign and update workload
     const now = new Date();
-    await tx.order.update({
+    const nextStatus =
+      order.status === "PENDING" || order.status === "CONFIRMED"
+        ? "PREPARING"
+        : order.status;
+
+    const updatedOrder = await tx.order.update({
       where: { id: orderId },
       data: {
         assignedBaristaId: targetBaristaId,
         assignedAt: now,
+        status: nextStatus,
+      },
+      include: {
+        user: true,
+        assignedBarista: true,
+        orderItems: { include: { product: true } },
       },
     });
 
@@ -166,16 +256,32 @@ const assignBaristaToOrder = async (
       baristaId: targetBaristaId,
       baristaName: targetBaristaName,
       assignedAt: now,
+      order: updatedOrder,
     };
   };
 
-  if (txClient) {
-    return await runInTx(txClient);
-  } else {
-    return await prisma.$transaction(async (tx) => {
-      return await runInTx(tx);
-    });
+  const result = txClient
+    ? await runInTx(txClient)
+    : await prisma.$transaction(async (tx) => await runInTx(tx), {
+        maxWait: 20000,
+        timeout: 60000,
+      });
+
+  if (!txClient && result.order) {
+    try {
+      emitOrderNotification({
+        type: "ORDER_STATUS_CHANGED",
+        order: result.order,
+        message: result.assigned
+          ? `Order #${result.order.orderNumber} assigned to Barista ${result.baristaName}.`
+          : `Order #${result.order.orderNumber} barista unassigned.`,
+      });
+    } catch (e) {
+      console.warn("Socket notification error on barista assignment:", e);
+    }
   }
+
+  return result;
 };
 
 /**
