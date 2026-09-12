@@ -1,7 +1,7 @@
 {
   "name": "express-prisma-api",
   "version": "1.0.0",
-  "main": "server.js",
+  "main": "dist/server.js",
   "author": "azan",
   "license": "MIT",
   "type": "module",
