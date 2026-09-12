@@ -13,7 +13,7 @@
     "build": "tsc",
     "start": "node ./dist/server.js",
     "test": "tsx --test tests/order-ai-automation.test.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate && tsc"
   },
   "dependencies": {
     "@google/genai": "^2.19.0",
