@@ -789,7 +789,11 @@ const getAllOrders = async (options: any) => {
               productExtra: true,
             },
           },
-          product: true,
+          product: {
+            include: {
+              category: true,
+            },
+          },
           coinProduct: true,
         },
       },
