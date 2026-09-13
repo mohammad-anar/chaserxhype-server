@@ -866,49 +866,73 @@ const updateOrderStatus = async (orderId: string, status: OrderStatus) => {
     throw new ApiError(StatusCodes.NOT_FOUND, "Order not found");
   }
 
-  const result = await prisma.$transaction(async (tx) => {
-    const updated = await tx.order.update({
-      where: { id: orderId },
-      data: {
-        status,
-        ...(status === "PREPARING" && !orderExists.preparedAt ? { preparedAt: new Date() } : {}),
-      },
-      include: {
-        orderItems: {
-          include: {
-            orderItemExtras: {
-              include: {
-                productExtra: true,
-              },
-            },
-            product: true,
-            coinProduct: true,
-          },
+  const result = await prisma.$transaction(
+    async (tx) => {
+      const updated = await tx.order.update({
+        where: { id: orderId },
+        data: {
+          status,
+          ...(status === "PREPARING" && !orderExists.preparedAt ? { preparedAt: new Date() } : {}),
         },
-        payments: true,
-        rewardPayments: true,
-        assignedBarista: true,
-      },
-    });
+        include: {
+          orderItems: {
+            include: {
+              orderItemExtras: {
+                include: {
+                  productExtra: true,
+                },
+              },
+              product: true,
+              coinProduct: true,
+            },
+          },
+          payments: true,
+          rewardPayments: true,
+          assignedBarista: true,
+        },
+      });
 
-    // If order transitioned to COMPLETED -> Deduct stock and release barista workload
-    if (status === "COMPLETED") {
-      await InventoryServices.deductStock(orderId, tx);
-      if (orderExists.assignedBaristaId) {
-        await BaristaServices.releaseBaristaWorkload(orderExists.assignedBaristaId, tx);
+      // If order transitioned to COMPLETED -> Deduct stock and release barista workload
+      if (status === "COMPLETED") {
+        try {
+          await InventoryServices.deductStock(orderId, tx);
+        } catch (stockErr: any) {
+          console.warn(`⚠️ Inventory stock deduction notice for order #${orderId}: ${stockErr.message}`);
+        }
+
+        if (orderExists.assignedBaristaId) {
+          try {
+            await BaristaServices.releaseBaristaWorkload(orderExists.assignedBaristaId, tx);
+          } catch (baristaErr: any) {
+            console.warn(`⚠️ Barista workload release notice for barista #${orderExists.assignedBaristaId}: ${baristaErr.message}`);
+          }
+        }
       }
-    }
 
-    // If order transitioned to CANCELED or FAILED -> Release stock and release barista workload
-    if (status === "CANCELED" || status === "FAILED") {
-      await InventoryServices.releaseStock(orderId, `Order status set to ${status}`, tx);
-      if (orderExists.assignedBaristaId) {
-        await BaristaServices.releaseBaristaWorkload(orderExists.assignedBaristaId, tx);
+      // If order transitioned to CANCELED or FAILED -> Release stock and release barista workload
+      if (status === "CANCELED" || status === "FAILED") {
+        try {
+          await InventoryServices.releaseStock(orderId, `Order status set to ${status}`, tx);
+        } catch (stockErr: any) {
+          console.warn(`⚠️ Inventory stock release notice for order #${orderId}: ${stockErr.message}`);
+        }
+
+        if (orderExists.assignedBaristaId) {
+          try {
+            await BaristaServices.releaseBaristaWorkload(orderExists.assignedBaristaId, tx);
+          } catch (baristaErr: any) {
+            console.warn(`⚠️ Barista workload release notice for barista #${orderExists.assignedBaristaId}: ${baristaErr.message}`);
+          }
+        }
       }
-    }
 
-    return updated;
-  });
+      return updated;
+    },
+    {
+      maxWait: 20000,
+      timeout: 60000,
+    }
+  );
 
   try {
     emitOrderNotification({
@@ -1031,6 +1055,9 @@ const refundOrder = async (orderId: string) => {
     }
 
     return result;
+  }, {
+    maxWait: 20000,
+    timeout: 60000,
   });
 };
 
