@@ -9,8 +9,18 @@ import { enqueueOrderAutomation } from "../../../queues/order.queue.js";
 const stripe = new Stripe(config.stripe.stripe_secret_key || "");
 
 const confirmPayment = async (sessionId: string) => {
-  // 1. Find the Payment record associated with the Stripe Session ID
-  const paymentRecord = await prisma.payment.findFirst({
+  console.log(`🔍 Confirming Stripe payment for session: ${sessionId}`);
+
+  // 1. Retrieve Stripe Checkout Session first to obtain metadata if needed
+  let session: Stripe.Checkout.Session | null = null;
+  try {
+    session = await stripe.checkout.sessions.retrieve(sessionId);
+  } catch (err: any) {
+    console.error(`❌ Failed to retrieve Stripe session ${sessionId}:`, err.message);
+  }
+
+  // 2. Find Payment record by gatewayPaymentId or orderId in metadata
+  let paymentRecord = await prisma.payment.findFirst({
     where: { gatewayPaymentId: sessionId },
     include: {
       order: {
@@ -25,12 +35,31 @@ const confirmPayment = async (sessionId: string) => {
     },
   });
 
+  if (!paymentRecord && session?.metadata?.orderId) {
+    console.log(`ℹ️ Lookup by gatewayPaymentId failed; attempting lookup by metadata.orderId: ${session.metadata.orderId}`);
+    paymentRecord = await prisma.payment.findFirst({
+      where: { orderId: session.metadata.orderId },
+      include: {
+        order: {
+          include: {
+            orderItems: {
+              include: {
+                product: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
   if (!paymentRecord) {
-    throw new ApiError(StatusCodes.NOT_FOUND, "Payment record not found for the given session ID");
+    throw new ApiError(StatusCodes.NOT_FOUND, `Payment record not found for session ID: ${sessionId}`);
   }
 
   // If already PAID, just return the order details immediately
   if (paymentRecord.status === "PAID") {
+    console.log(`✅ Payment record ${paymentRecord.id} is already marked as PAID.`);
     return await prisma.order.findUnique({
       where: { id: paymentRecord.orderId },
       include: {
@@ -51,10 +80,11 @@ const confirmPayment = async (sessionId: string) => {
     });
   }
 
-  // 2. Query Stripe Checkout Sessions outside DB transaction
-  const session = await stripe.checkout.sessions.retrieve(sessionId);
+  if (!session) {
+    session = await stripe.checkout.sessions.retrieve(sessionId);
+  }
 
-  if (session.payment_status !== "paid") {
+  if (session.payment_status !== "paid" && session.status !== "complete") {
     if (session.status === "expired") {
       await prisma.payment.update({
         where: { id: paymentRecord.id },

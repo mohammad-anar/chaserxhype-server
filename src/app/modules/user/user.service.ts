@@ -75,17 +75,15 @@ const createUser = async (payload: ICreateUserPayload) => {
     return user;
   });
 
-  // Send verification email
-  try {
-    const emailVal = emailTemplate.createAccount({
-      name: payload.name || payload.email,
-      email: payload.email,
-      otp: Number(otpCode),
-    });
-    await emailHelper.sendEmail(emailVal);
-  } catch (error) {
-    console.error("Failed to send verification email:", error);
-  }
+  // Send verification email asynchronously so user registration response is not delayed by SMTP
+  const emailVal = emailTemplate.createAccount({
+    name: payload.name || payload.email,
+    email: payload.email,
+    otp: Number(otpCode),
+  });
+  emailHelper.sendEmail(emailVal).catch((err) => {
+    console.error("Failed to send verification email:", err);
+  });
 
   console.log(`🔑 Signup OTP for ${payload.email}: ${otpCode}`);
 

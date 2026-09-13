@@ -7,10 +7,13 @@ export type ISendEmail = {
   html: string;
 };
 
+const emailPort = Number(config.email.port) || 587;
+const isSecure = emailPort === 465;
+
 const transporter = nodemailer.createTransport({
-  host: config.email.host,
-  port: Number(config.email.port),
-  secure: false,
+  host: config.email.host || "smtp.gmail.com",
+  port: emailPort,
+  secure: isSecure,
   auth: {
     user: config.email.user,
     pass: config.email.pass,
@@ -18,22 +21,27 @@ const transporter = nodemailer.createTransport({
   tls: {
     rejectUnauthorized: false,
   },
-  logger: true,
-  debug: true,
+  connectionTimeout: 8000, // 8s max connection timeout
+  greetingTimeout: 8000,
+  socketTimeout: 10000,
 });
 
 const sendEmail = async (values: ISendEmail) => {
   try {
+    if (!config.email.user || !config.email.pass) {
+      console.warn("⚠️ Email credentials not set in environment. Skipping email dispatch.");
+      return;
+    }
     const info = await transporter.sendMail({
-      from: `"CoffeeShop" <${config.email.from}>`,
+      from: `"Bean & Fien" <${config.email.from || config.email.user}>`,
       to: values.to,
       subject: values.subject,
       html: values.html,
     });
-
-
-  } catch (error) {
-    console.error("Email", error);
+    console.log(`✉️ Email successfully sent to ${values.to} (Message ID: ${info.messageId})`);
+    return info;
+  } catch (error: any) {
+    console.error(`❌ Email sending failed for ${values.to}:`, error?.message || error);
   }
 };
 

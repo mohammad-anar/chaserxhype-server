@@ -148,15 +148,14 @@ const forgotPassword = async (payload: IForgotPasswordPayload) => {
     },
   });
 
-  try {
-    const emailVal = emailTemplate.resetPassword({
-      email: user.email,
-      otp: Number(otpCode),
-    });
-    await emailHelper.sendEmail(emailVal);
-  } catch (error) {
-    console.error("Failed to send reset password email:", error);
-  }
+  // Send reset password email asynchronously
+  const emailVal = emailTemplate.resetPassword({
+    email: user.email,
+    otp: Number(otpCode),
+  });
+  emailHelper.sendEmail(emailVal).catch((err) => {
+    console.error("Failed to send reset password email:", err);
+  });
 
   console.log(`🔑 Reset Password OTP for ${user.email}: ${otpCode}`);
 
@@ -329,16 +328,15 @@ const resendOtp = async (payload: IResendOtpPayload) => {
     },
   });
 
-  try {
-    const emailVal = emailTemplate.createAccount({
-      name: user.name || user.email,
-      email: user.email,
-      otp: Number(otpCode),
-    });
-    await emailHelper.sendEmail(emailVal);
-  } catch (error) {
-    console.error("Failed to resend email:", error);
-  }
+  // Send verification email asynchronously
+  const emailVal = emailTemplate.createAccount({
+    name: user.name || user.email,
+    email: user.email,
+    otp: Number(otpCode),
+  });
+  emailHelper.sendEmail(emailVal).catch((err) => {
+    console.error("Failed to resend email:", err);
+  });
 
   console.log(`🔑 Resent OTP for ${user.email}: ${otpCode}`);
 

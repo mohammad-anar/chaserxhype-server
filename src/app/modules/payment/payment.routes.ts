@@ -9,6 +9,16 @@ router.post(
   PaymentController.stripeWebhook
 );
 
+router.post(
+  "/confirm",
+  PaymentController.confirmPayment
+);
+
+router.get(
+  "/confirm",
+  PaymentController.confirmPayment
+);
+
 router.get(
   "/my-payments",
   auth("USER", "ADMIN"),
