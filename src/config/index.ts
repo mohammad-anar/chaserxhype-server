@@ -17,6 +17,8 @@ export default {
     port: process.env.EMAIL_PORT,
     host: process.env.EMAIL_HOST,
     pass: process.env.EMAIL_PASS,
+    resend_api_key: process.env.RESEND_API_KEY,
+    brevo_api_key: process.env.BREVO_API_KEY,
   },
   jwt: {
     jwt_secret: process.env.JWT_SECRET,

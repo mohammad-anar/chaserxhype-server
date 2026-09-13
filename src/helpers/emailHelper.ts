@@ -39,21 +39,84 @@ const transporter = isGmail
     });
 
 const sendEmail = async (values: ISendEmail) => {
+  const senderName = "Bean & Fien";
+  const senderEmail = config.email.from || config.email.user || "onboarding@resend.dev";
+
+  // ── Strategy 1: Resend HTTP API (Recommended for Cloud / Render) ──────────
+  if (config.email.resend_api_key) {
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${config.email.resend_api_key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: `${senderName} <${senderEmail}>`,
+          to: [values.to],
+          subject: values.subject,
+          html: values.html,
+        }),
+      });
+
+      const data = (await res.json()) as any;
+      if (res.ok) {
+        console.log(`✉️ Email successfully sent via Resend API to ${values.to} (ID: ${data.id})`);
+        return data;
+      } else {
+        console.error(`❌ Resend API error:`, data);
+      }
+    } catch (resendErr: any) {
+      console.error(`❌ Resend API request failed:`, resendErr.message);
+    }
+  }
+
+  // ── Strategy 2: Brevo HTTP API ──────────────────────────────────────────
+  if (config.email.brevo_api_key) {
+    try {
+      const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: {
+          "api-key": config.email.brevo_api_key,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sender: { name: senderName, email: senderEmail },
+          to: [{ email: values.to }],
+          subject: values.subject,
+          htmlContent: values.html,
+        }),
+      });
+
+      const data = (await res.json()) as any;
+      if (res.ok) {
+        console.log(`✉️ Email successfully sent via Brevo API to ${values.to} (MessageId: ${data.messageId})`);
+        return data;
+      } else {
+        console.error(`❌ Brevo API error:`, data);
+      }
+    } catch (brevoErr: any) {
+      console.error(`❌ Brevo API request failed:`, brevoErr.message);
+    }
+  }
+
+  // ── Strategy 3: Nodemailer SMTP (Localhost / unblocked networks) ──────────
   try {
     if (!config.email.user || !config.email.pass) {
-      console.warn("⚠️ Email credentials not set in environment. Skipping email dispatch.");
+      console.warn("⚠️ Email credentials not configured in environment. Skipping SMTP send.");
       return;
     }
     const info = await transporter.sendMail({
-      from: `"Bean & Fien" <${config.email.from || config.email.user}>`,
+      from: `"${senderName}" <${senderEmail}>`,
       to: values.to,
       subject: values.subject,
       html: values.html,
     });
-    console.log(`✉️ Email successfully sent to ${values.to} (Message ID: ${info.messageId})`);
+    console.log(`✉️ Email successfully sent via SMTP to ${values.to} (Message ID: ${info.messageId})`);
     return info;
   } catch (error: any) {
-    console.error(`❌ Email sending failed for ${values.to}:`, error?.message || error);
+    console.error(`❌ SMTP email sending failed for ${values.to}:`, error?.message || error);
+    console.info(`💡 Tip: Render blocks outbound SMTP ports. Use a free RESEND_API_KEY or BREVO_API_KEY (over HTTPS) for 100% reliable cloud delivery.`);
   }
 };
 
