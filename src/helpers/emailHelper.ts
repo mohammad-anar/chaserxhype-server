@@ -9,22 +9,34 @@ export type ISendEmail = {
 
 const emailPort = Number(config.email.port) || 587;
 const isSecure = emailPort === 465;
+const isGmail = (config.email.host || "").includes("gmail") || (config.email.user || "").includes("@gmail.com");
 
-const transporter = nodemailer.createTransport({
-  host: config.email.host || "smtp.gmail.com",
-  port: emailPort,
-  secure: isSecure,
-  auth: {
-    user: config.email.user,
-    pass: config.email.pass,
-  },
-  tls: {
-    rejectUnauthorized: false,
-  },
-  connectionTimeout: 8000, // 8s max connection timeout
-  greetingTimeout: 8000,
-  socketTimeout: 10000,
-});
+const transporter = isGmail
+  ? nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: config.email.user,
+        pass: config.email.pass,
+      },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
+    })
+  : nodemailer.createTransport({
+      host: config.email.host || "smtp.gmail.com",
+      port: emailPort,
+      secure: isSecure,
+      auth: {
+        user: config.email.user,
+        pass: config.email.pass,
+      },
+      tls: {
+        rejectUnauthorized: false,
+      },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
+    });
 
 const sendEmail = async (values: ISendEmail) => {
   try {
