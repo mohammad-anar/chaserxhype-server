@@ -10,37 +10,63 @@ import { GiftCardServices } from "../giftCard/giftCard.service.js";
 
 const stripe = new Stripe(config.stripe.stripe_secret_key || "");
 
-const confirmPayment = async (sessionId: string) => {
-  console.log(`🔍 Confirming Stripe payment for session: ${sessionId}`);
+const confirmPayment = async (sessionIdOrId: string) => {
+  console.log(`🔍 Confirming Stripe payment for: ${sessionIdOrId}`);
 
-  // 1. Retrieve Stripe Checkout Session first to obtain metadata if needed
-  let session: Stripe.Checkout.Session | null = null;
-  try {
-    session = await stripe.checkout.sessions.retrieve(sessionId);
-  } catch (err: any) {
-    console.error(`❌ Failed to retrieve Stripe session ${sessionId}:`, err.message);
-  }
-
-  // Check if this session is a Gift Card Order checkout
-  if (session?.metadata?.type === "GIFT_CARD_ORDER" || session?.metadata?.giftCardOrderId) {
-    const paymentIntentId =
-      typeof session.payment_intent === "string" ? session.payment_intent : session.id;
-    return await GiftCardServices.confirmGiftCardOrderPayment(sessionId, paymentIntentId);
-  }
-
-  const giftCardOrderRecord = await prisma.giftCardOrder.findFirst({
-    where: { stripeSessionId: sessionId },
+  // 1. Check if identifier is directly a GiftCardOrder ID
+  const directGiftCardOrder = await prisma.giftCardOrder.findUnique({
+    where: { id: sessionIdOrId },
   });
-
-  if (giftCardOrderRecord) {
-    const paymentIntentId =
-      session && typeof session.payment_intent === "string" ? session.payment_intent : session?.id;
-    return await GiftCardServices.confirmGiftCardOrderPayment(sessionId, paymentIntentId);
+  if (directGiftCardOrder) {
+    return await GiftCardServices.confirmGiftCardOrderPayment(directGiftCardOrder.stripeSessionId || sessionIdOrId);
   }
 
-  // 2. Find Payment record by gatewayPaymentId or orderId in metadata
+  // 2. Check if a GiftCardOrder exists with stripeSessionId or stripePaymentIntentId
+  const matchedGiftCardOrder = await prisma.giftCardOrder.findFirst({
+    where: {
+      OR: [
+        { stripeSessionId: sessionIdOrId },
+        { stripePaymentIntentId: sessionIdOrId },
+      ],
+    },
+  });
+  if (matchedGiftCardOrder) {
+    return await GiftCardServices.confirmGiftCardOrderPayment(sessionIdOrId);
+  }
+
+  // 3. Inspect Stripe Session or PaymentIntent
+  let session: Stripe.Checkout.Session | null = null;
+  if (sessionIdOrId.startsWith("cs_")) {
+    try {
+      session = await stripe.checkout.sessions.retrieve(sessionIdOrId);
+    } catch (err: any) {
+      console.warn(`Could not retrieve Stripe session ${sessionIdOrId}:`, err.message);
+    }
+
+    if (session?.metadata?.type === "GIFT_CARD_ORDER" || session?.metadata?.giftCardOrderId) {
+      const paymentIntentId =
+        typeof session.payment_intent === "string" ? session.payment_intent : session.id;
+      return await GiftCardServices.confirmGiftCardOrderPayment(sessionIdOrId, paymentIntentId);
+    }
+  } else if (sessionIdOrId.startsWith("pi_")) {
+    try {
+      const pi = await stripe.paymentIntents.retrieve(sessionIdOrId);
+      if (pi?.metadata?.type === "GIFT_CARD_ORDER" || pi?.metadata?.giftCardOrderId) {
+        return await GiftCardServices.confirmGiftCardOrderPayment(sessionIdOrId, sessionIdOrId);
+      }
+    } catch (err: any) {
+      console.warn(`Could not retrieve Stripe PaymentIntent ${sessionIdOrId}:`, err.message);
+    }
+  }
+
+  // 4. Find Payment record by gatewayPaymentId or orderId in metadata
   let paymentRecord = await prisma.payment.findFirst({
-    where: { gatewayPaymentId: sessionId },
+    where: {
+      OR: [
+        { gatewayPaymentId: sessionIdOrId },
+        { transactionId: sessionIdOrId },
+      ],
+    },
     include: {
       order: {
         include: {
@@ -73,7 +99,7 @@ const confirmPayment = async (sessionId: string) => {
   }
 
   if (!paymentRecord) {
-    throw new ApiError(StatusCodes.NOT_FOUND, `Payment record not found for session ID: ${sessionId}`);
+    throw new ApiError(StatusCodes.NOT_FOUND, `Payment record not found for ID: ${sessionIdOrId}`);
   }
 
   // If already PAID, just return the order details immediately
@@ -99,11 +125,11 @@ const confirmPayment = async (sessionId: string) => {
     });
   }
 
-  if (!session) {
-    session = await stripe.checkout.sessions.retrieve(sessionId);
+  if (!session && sessionIdOrId.startsWith("cs_")) {
+    session = await stripe.checkout.sessions.retrieve(sessionIdOrId);
   }
 
-  if (session.payment_status !== "paid" && session.status !== "complete") {
+  if (session && session.payment_status !== "paid" && session.status !== "complete") {
     if (session.status === "expired") {
       await prisma.payment.update({
         where: { id: paymentRecord.id },
@@ -124,14 +150,16 @@ const confirmPayment = async (sessionId: string) => {
   const result = await prisma.$transaction(
     async (tx) => {
       const paymentIntentId =
-        typeof session.payment_intent === "string" ? session.payment_intent : session.id;
+        session && typeof session.payment_intent === "string"
+          ? session.payment_intent
+          : session?.id || sessionIdOrId;
 
       await tx.payment.update({
         where: { id: paymentRecord.id },
         data: {
           status: "PAID",
           transactionId: paymentIntentId,
-          gateWayPaymentResponse: JSON.stringify(session),
+          gateWayPaymentResponse: session ? JSON.stringify(session) : JSON.stringify({ id: sessionIdOrId }),
           paidAt: new Date(),
         },
       });

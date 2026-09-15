@@ -92,6 +92,16 @@ const createGiftCardOrderCheckout = async (
           recipientEmail: normalizedEmail,
           recipientName: recipientName.trim(),
         },
+        payment_intent_data: {
+          metadata: {
+            type: "GIFT_CARD_ORDER",
+            giftCardOrderId: giftCardOrder.id,
+            orderNumber: giftCardOrder.orderNumber,
+            amount: amount.toString(),
+            recipientEmail: normalizedEmail,
+            recipientName: recipientName.trim(),
+          },
+        },
       });
 
       paymentUrl = session.url;
@@ -116,28 +126,34 @@ const createGiftCardOrderCheckout = async (
 };
 
 /**
- * Confirms payment for a GiftCardOrder (via Stripe Webhook or direct confirm)
+ * Confirms payment for a GiftCardOrder (via Stripe Webhook, polling, or direct confirm)
  * Issues the active GiftCard, credits recipient if registered, creates notifications & transactions.
  */
 const confirmGiftCardOrderPayment = async (
-  sessionId: string,
+  sessionIdOrId: string,
   paymentIntentId?: string
 ) => {
-  console.log(`🎁 Confirming GiftCardOrder payment for session: ${sessionId}`);
+  console.log(`🎁 Confirming GiftCardOrder payment for: ${sessionIdOrId}`);
 
-  // 1. Find the GiftCardOrder by stripeSessionId or lookup by metadata
+  // 1. Find the GiftCardOrder by ID, stripeSessionId, or stripePaymentIntentId
   let order = await prisma.giftCardOrder.findFirst({
-    where: { stripeSessionId: sessionId },
+    where: {
+      OR: [
+        { stripeSessionId: sessionIdOrId },
+        { id: sessionIdOrId },
+        { stripePaymentIntentId: sessionIdOrId },
+      ],
+    },
     include: {
       giftCard: true,
       purchaser: true,
     },
   });
 
-  if (!order) {
-    // Try to retrieve session from stripe
+  // 2. If not found and identifier starts with 'cs_' (Checkout Session)
+  if (!order && sessionIdOrId.startsWith("cs_")) {
     try {
-      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      const session = await stripe.checkout.sessions.retrieve(sessionIdOrId);
       if (session?.metadata?.giftCardOrderId) {
         order = await prisma.giftCardOrder.findUnique({
           where: { id: session.metadata.giftCardOrderId },
@@ -147,16 +163,55 @@ const confirmGiftCardOrderPayment = async (
           },
         });
       }
+      if (session && !paymentIntentId && typeof session.payment_intent === "string") {
+        paymentIntentId = session.payment_intent;
+      }
     } catch (e: any) {
-      console.error("Failed to retrieve Stripe session for GiftCardOrder:", e.message);
+      console.warn("Could not retrieve Stripe checkout session:", e.message);
+    }
+  }
+
+  // 3. If not found and identifier starts with 'pi_' (Payment Intent)
+  if (!order && sessionIdOrId.startsWith("pi_")) {
+    try {
+      const pi = await stripe.paymentIntents.retrieve(sessionIdOrId);
+      if (pi?.metadata?.giftCardOrderId) {
+        order = await prisma.giftCardOrder.findUnique({
+          where: { id: pi.metadata.giftCardOrderId },
+          include: {
+            giftCard: true,
+            purchaser: true,
+          },
+        });
+      }
+      if (!order) {
+        const sessions = await stripe.checkout.sessions.list({
+          payment_intent: sessionIdOrId,
+          limit: 1,
+        });
+        if (sessions.data.length > 0) {
+          const session = sessions.data[0];
+          if (session.metadata?.giftCardOrderId) {
+            order = await prisma.giftCardOrder.findUnique({
+              where: { id: session.metadata.giftCardOrderId },
+              include: {
+                giftCard: true,
+                purchaser: true,
+              },
+            });
+          }
+        }
+      }
+    } catch (e: any) {
+      console.warn("Could not retrieve Stripe payment intent:", e.message);
     }
   }
 
   if (!order) {
-    throw new ApiError(StatusCodes.NOT_FOUND, `GiftCardOrder not found for session ID: ${sessionId}`);
+    throw new ApiError(StatusCodes.NOT_FOUND, `GiftCardOrder not found for identifier: ${sessionIdOrId}`);
   }
 
-  // If already PAID, return order immediately
+  // If already PAID, return order immediately (idempotent)
   if (order.paymentStatus === PaymentStatus.PAID && order.giftCard) {
     console.log(`✅ GiftCardOrder ${order.orderNumber} is already marked as PAID.`);
     return order;
@@ -166,7 +221,7 @@ const confirmGiftCardOrderPayment = async (
   const code = generateGiftCardCode();
   const purchaserName = order.purchaser?.name || "A friend";
 
-  // 2. Execute atomic fulfillment transaction
+  // 4. Execute atomic fulfillment transaction
   const result = await prisma.$transaction(async (tx) => {
     // Check if recipient is a registered user
     const recipientUser = await tx.user.findFirst({
@@ -249,7 +304,7 @@ const confirmGiftCardOrderPayment = async (
       data: {
         paymentStatus: PaymentStatus.PAID,
         orderStatus: OrderStatus.COMPLETED,
-        stripePaymentIntentId: paymentIntentId || null,
+        stripePaymentIntentId: paymentIntentId || order.stripePaymentIntentId || null,
         giftCardId: giftCard.id,
       },
       include: {
@@ -266,10 +321,11 @@ const confirmGiftCardOrderPayment = async (
 };
 
 /**
- * Get a single gift card order by ID (used for live status polling on frontend)
+ * Get a single gift card order by ID (used for live status polling on frontend & mobile)
+ * Automatically checks Stripe status and fulfills if pending payment is complete.
  */
 const getGiftCardOrderById = async (id: string) => {
-  const order = await prisma.giftCardOrder.findUnique({
+  let order = await prisma.giftCardOrder.findUnique({
     where: { id },
     include: {
       giftCard: {
@@ -299,6 +355,22 @@ const getGiftCardOrderById = async (id: string) => {
 
   if (!order) {
     throw new ApiError(StatusCodes.NOT_FOUND, "Gift card order not found");
+  }
+
+  // Self-healing / On-demand polling check against Stripe if order is still PENDING
+  if (order.paymentStatus === PaymentStatus.PENDING && order.stripeSessionId && config.stripe.stripe_secret_key) {
+    try {
+      const session = await stripe.checkout.sessions.retrieve(order.stripeSessionId);
+      if (session.payment_status === "paid" || session.status === "complete") {
+        const paymentIntentId =
+          typeof session.payment_intent === "string" ? session.payment_intent : undefined;
+        console.log(`⚡ Auto-fulfilling pending GiftCardOrder ${order.id} via on-demand Stripe verification.`);
+        const fulfilled = await confirmGiftCardOrderPayment(order.stripeSessionId, paymentIntentId);
+        return fulfilled;
+      }
+    } catch (err: any) {
+      console.warn("Could not check Stripe status during order poll:", err.message);
+    }
   }
 
   return order;
