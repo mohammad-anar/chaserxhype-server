@@ -42,7 +42,6 @@ const updateGiftCardZodSchema = z.object({
   isActive: z.boolean().optional(),
 });
 const adminAddFundsZodSchema = z.object({
-
   giftCardId: z.string().optional(),
   userId: z.string().optional(),
   email: z.string().optional(),
@@ -53,10 +52,37 @@ const adminAddFundsZodSchema = z.object({
     .positive("Amount must be greater than 0"),
   reason: z.string().optional(),
 });
+
+const createGiftCardStyleZodSchema = z.object({
+  name: z.string({ message: "Style name is required" }),
+  image: z.string({ message: "Style image URL is required" }),
+  order: z.number().int().optional().default(0),
+});
+
+const updateGiftCardStyleZodSchema = z.object({
+  name: z.string().optional(),
+  image: z.string().optional(),
+  isActive: z.boolean().optional(),
+  order: z.number().int().optional(),
+});
+
+const adminUpdateGiftCardZodSchema = z.object({
+  nickname: z.string().optional(),
+  recipientName: z.string().optional(),
+  recipientEmail: z.string().email("Invalid email").optional(),
+  personalMessage: z.string().optional(),
+  status: z.enum(["ACTIVE", "INACTIVE", "DEPLETED", "EXPIRED"]).optional(),
+  isActive: z.boolean().optional(),
+  designIndex: z.number().int().optional(),
+});
+
 export const GiftCardValidation = {
   createGiftCardZodSchema,
   createGiftCardOrderZodSchema,
   redeemGiftCardZodSchema,
   updateGiftCardZodSchema,
   adminAddFundsZodSchema,
+  createGiftCardStyleZodSchema,
+  updateGiftCardStyleZodSchema,
+  adminUpdateGiftCardZodSchema,
 };

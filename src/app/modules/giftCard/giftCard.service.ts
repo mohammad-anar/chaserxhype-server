@@ -13,6 +13,9 @@ import {
   IAdminAddFundsPayload,
   IGiftCardFilterableFields,
   IGiftCardOrderFilterableFields,
+  ICreateGiftCardStylePayload,
+  IUpdateGiftCardStylePayload,
+  IAdminUpdateGiftCardPayload,
 } from "./giftCard.interface.js";
 
 const stripe = new Stripe(config.stripe.stripe_secret_key || "");
@@ -837,6 +840,138 @@ const checkBalanceByCode = async (code: string) => {
   return card;
 };
 
+// ==================== GIFT CARD STYLES / TEMPLATES ====================
+
+const DEFAULT_STYLES = [
+  { name: "Coffee Beans", image: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=600&q=80", order: 0 },
+  { name: "Morning Brew", image: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=600&q=80", order: 1 },
+  { name: "Swirled Cream", image: "https://images.unsplash.com/photo-1511920170033-f8396924c348?auto=format&fit=crop&w=600&q=80", order: 2 },
+  { name: "Cozy Mug", image: "https://images.unsplash.com/photo-1507133750040-4a8f57021571?auto=format&fit=crop&w=600&q=80", order: 3 },
+];
+
+const getAllStyles = async (onlyActive = false) => {
+  let count = await prisma.giftCardStyle.count();
+  if (count === 0) {
+    // Seed default styles
+    await prisma.giftCardStyle.createMany({
+      data: DEFAULT_STYLES,
+    });
+  }
+
+  const styles = await prisma.giftCardStyle.findMany({
+    where: onlyActive ? { isActive: true } : {},
+    orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+  });
+
+  return styles;
+};
+
+const createStyle = async (payload: ICreateGiftCardStylePayload) => {
+  const count = await prisma.giftCardStyle.count();
+  const style = await prisma.giftCardStyle.create({
+    data: {
+      name: payload.name.trim(),
+      image: payload.image.trim(),
+      order: payload.order !== undefined ? payload.order : count,
+      isActive: true,
+    },
+  });
+  return style;
+};
+
+const updateStyle = async (id: string, payload: IUpdateGiftCardStylePayload) => {
+  const existing = await prisma.giftCardStyle.findUnique({ where: { id } });
+  if (!existing) {
+    throw new ApiError(StatusCodes.NOT_FOUND, "Gift card style not found");
+  }
+
+  const updated = await prisma.giftCardStyle.update({
+    where: { id },
+    data: {
+      name: payload.name !== undefined ? payload.name.trim() : existing.name,
+      image: payload.image !== undefined ? payload.image.trim() : existing.image,
+      isActive: payload.isActive !== undefined ? payload.isActive : existing.isActive,
+      order: payload.order !== undefined ? payload.order : existing.order,
+    },
+  });
+  return updated;
+};
+
+const deleteStyle = async (id: string) => {
+  const existing = await prisma.giftCardStyle.findUnique({ where: { id } });
+  if (!existing) {
+    throw new ApiError(StatusCodes.NOT_FOUND, "Gift card style not found");
+  }
+
+  await prisma.giftCardStyle.delete({ where: { id } });
+  return { message: "Gift card style deleted successfully" };
+};
+
+// ==================== ADMIN GIFT CARD DETAILS & UPDATE ====================
+
+const adminGetGiftCardById = async (id: string) => {
+  const card = await prisma.giftCard.findUnique({
+    where: { id },
+    include: {
+      purchaser: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          profileImage: true,
+        },
+      },
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          giftCardBalance: true,
+        },
+      },
+      order: true,
+      transactions: {
+        orderBy: { createdAt: "desc" },
+      },
+    },
+  });
+
+  if (!card) {
+    throw new ApiError(StatusCodes.NOT_FOUND, "Gift card not found");
+  }
+
+  return card;
+};
+
+const adminUpdateGiftCard = async (id: string, payload: IAdminUpdateGiftCardPayload) => {
+  const card = await prisma.giftCard.findUnique({ where: { id } });
+  if (!card) {
+    throw new ApiError(StatusCodes.NOT_FOUND, "Gift card not found");
+  }
+
+  const updated = await prisma.giftCard.update({
+    where: { id },
+    data: {
+      nickname: payload.nickname !== undefined ? payload.nickname : card.nickname,
+      recipientName: payload.recipientName !== undefined ? payload.recipientName : card.recipientName,
+      recipientEmail: payload.recipientEmail !== undefined ? payload.recipientEmail.toLowerCase() : card.recipientEmail,
+      personalMessage: payload.personalMessage !== undefined ? payload.personalMessage : card.personalMessage,
+      status: payload.status !== undefined ? payload.status : card.status,
+      isActive: payload.isActive !== undefined ? payload.isActive : card.isActive,
+      designIndex: payload.designIndex !== undefined ? payload.designIndex : card.designIndex,
+    },
+    include: {
+      purchaser: true,
+      user: true,
+      transactions: {
+        orderBy: { createdAt: "desc" },
+      },
+    },
+  });
+
+  return updated;
+};
+
 export const GiftCardServices = {
   createGiftCardOrderCheckout,
   confirmGiftCardOrderPayment,
@@ -849,4 +984,10 @@ export const GiftCardServices = {
   getAllGiftCards,
   adminAddFunds,
   checkBalanceByCode,
+  getAllStyles,
+  createStyle,
+  updateStyle,
+  deleteStyle,
+  adminGetGiftCardById,
+  adminUpdateGiftCard,
 };

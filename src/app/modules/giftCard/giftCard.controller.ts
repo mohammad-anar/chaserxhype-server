@@ -131,6 +131,79 @@ const checkBalanceByCode = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+// Styles
+const getAllStyles = catchAsync(async (req: Request, res: Response) => {
+  const onlyActive = req.query.active === "true";
+  const result = await GiftCardServices.getAllStyles(onlyActive);
+
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: "Gift card styles retrieved successfully",
+    data: result,
+  });
+});
+
+const createStyle = catchAsync(async (req: Request, res: Response) => {
+  const result = await GiftCardServices.createStyle(req.body);
+
+  sendResponse(res, {
+    statusCode: StatusCodes.CREATED,
+    success: true,
+    message: "Gift card style created successfully",
+    data: result,
+  });
+});
+
+const updateStyle = catchAsync(async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  const result = await GiftCardServices.updateStyle(id, req.body);
+
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: "Gift card style updated successfully",
+    data: result,
+  });
+});
+
+const deleteStyle = catchAsync(async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  const result = await GiftCardServices.deleteStyle(id);
+
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: result.message,
+    data: result,
+  });
+});
+
+// Admin Card Details & Update
+const adminGetGiftCardById = catchAsync(async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  const result = await GiftCardServices.adminGetGiftCardById(id);
+
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: "Gift card details retrieved successfully",
+    data: result,
+  });
+});
+
+const adminUpdateGiftCard = catchAsync(async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  const result = await GiftCardServices.adminUpdateGiftCard(id, req.body);
+
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: "Gift card updated successfully",
+    data: result,
+  });
+});
+
 export const GiftCardController = {
   createGiftCardOrderCheckout,
   getGiftCardOrderById,
@@ -142,4 +215,10 @@ export const GiftCardController = {
   getAllGiftCards,
   adminAddFunds,
   checkBalanceByCode,
+  getAllStyles,
+  createStyle,
+  updateStyle,
+  deleteStyle,
+  adminGetGiftCardById,
+  adminUpdateGiftCard,
 };

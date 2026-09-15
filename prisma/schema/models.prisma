@@ -701,5 +701,14 @@ model PointTransaction {
     @@map("point_transactions")
 }
 
+model GiftCardStyle {
+    id        String   @id @default(cuid())
+    name      String
+    image     String
+    isActive  Boolean  @default(true)
+    order     Int      @default(0)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
 
-
+    @@map("gift_card_styles")
+}

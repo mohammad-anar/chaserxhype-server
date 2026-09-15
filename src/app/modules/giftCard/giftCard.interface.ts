@@ -50,3 +50,27 @@ export interface IGiftCardOrderFilterableFields {
   startDate?: string;
   endDate?: string;
 }
+
+export interface ICreateGiftCardStylePayload {
+  name: string;
+  image: string;
+  order?: number;
+}
+
+export interface IUpdateGiftCardStylePayload {
+  name?: string;
+  image?: string;
+  isActive?: boolean;
+  order?: number;
+}
+
+export interface IAdminUpdateGiftCardPayload {
+  nickname?: string;
+  recipientName?: string;
+  recipientEmail?: string;
+  personalMessage?: string;
+  status?: GiftCardStatus;
+  isActive?: boolean;
+  designIndex?: number;
+}
+

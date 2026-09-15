@@ -63,6 +63,52 @@ router.get(
   GiftCardController.checkBalanceByCode
 );
 
+// ==================== STYLES ====================
+// Get all styles (public)
+router.get(
+  "/styles",
+  GiftCardController.getAllStyles
+);
+
+// Admin: create style
+router.post(
+  "/styles",
+  auth(UserRole.ADMIN),
+  validateRequest(GiftCardValidation.createGiftCardStyleZodSchema),
+  GiftCardController.createStyle
+);
+
+// Admin: update style
+router.patch(
+  "/styles/:id",
+  auth(UserRole.ADMIN),
+  validateRequest(GiftCardValidation.updateGiftCardStyleZodSchema),
+  GiftCardController.updateStyle
+);
+
+// Admin: delete style
+router.delete(
+  "/styles/:id",
+  auth(UserRole.ADMIN),
+  GiftCardController.deleteStyle
+);
+
+// ==================== ADMIN CARD DETAILS & UPDATE ====================
+// Admin: get gift card details with full history
+router.get(
+  "/admin/cards/:id",
+  auth(UserRole.ADMIN),
+  GiftCardController.adminGetGiftCardById
+);
+
+// Admin: update gift card settings/status
+router.patch(
+  "/admin/cards/:id",
+  auth(UserRole.ADMIN),
+  validateRequest(GiftCardValidation.adminUpdateGiftCardZodSchema),
+  GiftCardController.adminUpdateGiftCard
+);
+
 // Admin: view all issued gift cards
 router.get(
   "/admin/all",
