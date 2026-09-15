@@ -11,7 +11,24 @@ const createGiftCardZodSchema = z.object({
     recipientName: z.string({
       message: "Recipient name is required",
     }),
-    recipientEmail: z.email("Invalid email format"),
+    recipientEmail: z.string().email("Invalid email format"),
+    personalMessage: z.string().optional(),
+    nickname: z.string().optional(),
+  }),
+});
+
+const createGiftCardOrderZodSchema = z.object({
+  body: z.object({
+    designIndex: z.number().int().min(0).max(3).optional().default(0),
+    amount: z
+      .number({
+        message: "Gift card amount is required",
+      })
+      .positive("Amount must be greater than 0"),
+    recipientName: z.string({
+      message: "Recipient name is required",
+    }),
+    recipientEmail: z.string().email("Invalid email format"),
     personalMessage: z.string().optional(),
     nickname: z.string().optional(),
   }),
@@ -48,6 +65,7 @@ const adminAddFundsZodSchema = z.object({
 
 export const GiftCardValidation = {
   createGiftCardZodSchema,
+  createGiftCardOrderZodSchema,
   redeemGiftCardZodSchema,
   updateGiftCardZodSchema,
   adminAddFundsZodSchema,

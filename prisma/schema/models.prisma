@@ -34,6 +34,7 @@ model User {
     tipsReceived       Tip[]           @relation("BaristaTips")
     giftCards          GiftCard[]      @relation("RecipientGiftCards")
     purchasedGiftCards GiftCard[]      @relation("PurchasedGiftCards")
+    purchasedGiftCardOrders GiftCardOrder[] @relation("PurchasedGiftCardOrders")
     pointTransactions  PointTransaction[]
     giftCardTransactions GiftCardTransaction[]
 
@@ -637,8 +638,35 @@ model GiftCard {
     updatedAt      DateTime       @updatedAt
 
     transactions   GiftCardTransaction[]
+    order          GiftCardOrder?
 
     @@map("gift_cards")
+}
+
+model GiftCardOrder {
+    id                    String        @id @default(cuid())
+    orderNumber           String        @unique
+    amount                Decimal
+    recipientName         String
+    recipientEmail        String
+    personalMessage       String?
+    designIndex           Int           @default(0)
+    nickname              String?
+    orderStatus           OrderStatus   @default(PENDING)
+    paymentStatus         PaymentStatus @default(PENDING)
+    stripeSessionId       String?       @unique
+    stripePaymentIntentId String?
+
+    purchaserId           String?
+    purchaser             User?         @relation("PurchasedGiftCardOrders", fields: [purchaserId], references: [id])
+
+    giftCardId            String?       @unique
+    giftCard              GiftCard?     @relation(fields: [giftCardId], references: [id], onDelete: SetNull)
+
+    createdAt             DateTime      @default(now())
+    updatedAt             DateTime      @updatedAt
+
+    @@map("gift_card_orders")
 }
 
 model GiftCardTransaction {

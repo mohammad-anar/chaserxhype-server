@@ -6,6 +6,8 @@ import Stripe from "stripe";
 import config from "../../../config/index.js";
 import { enqueueOrderAutomation } from "../../../queues/order.queue.js";
 
+import { GiftCardServices } from "../giftCard/giftCard.service.js";
+
 const stripe = new Stripe(config.stripe.stripe_secret_key || "");
 
 const confirmPayment = async (sessionId: string) => {
@@ -17,6 +19,23 @@ const confirmPayment = async (sessionId: string) => {
     session = await stripe.checkout.sessions.retrieve(sessionId);
   } catch (err: any) {
     console.error(`❌ Failed to retrieve Stripe session ${sessionId}:`, err.message);
+  }
+
+  // Check if this session is a Gift Card Order checkout
+  if (session?.metadata?.type === "GIFT_CARD_ORDER" || session?.metadata?.giftCardOrderId) {
+    const paymentIntentId =
+      typeof session.payment_intent === "string" ? session.payment_intent : session.id;
+    return await GiftCardServices.confirmGiftCardOrderPayment(sessionId, paymentIntentId);
+  }
+
+  const giftCardOrderRecord = await prisma.giftCardOrder.findFirst({
+    where: { stripeSessionId: sessionId },
+  });
+
+  if (giftCardOrderRecord) {
+    const paymentIntentId =
+      session && typeof session.payment_intent === "string" ? session.payment_intent : session?.id;
+    return await GiftCardServices.confirmGiftCardOrderPayment(sessionId, paymentIntentId);
   }
 
   // 2. Find Payment record by gatewayPaymentId or orderId in metadata

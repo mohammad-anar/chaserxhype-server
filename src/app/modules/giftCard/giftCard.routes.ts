@@ -7,11 +7,31 @@ import { GiftCardValidation } from "./giftCard.validation.js";
 
 const router = express.Router();
 
-// Public or optional-auth: purchase a gift card
+// Direct Gift Card Order Checkout (Public or Authenticated)
 router.post(
-  "/checkout",
-  validateRequest(GiftCardValidation.createGiftCardZodSchema),
-  GiftCardController.createGiftCardCheckout
+  "/order-checkout",
+  validateRequest(GiftCardValidation.createGiftCardOrderZodSchema),
+  GiftCardController.createGiftCardOrderCheckout
+);
+
+// Get single Gift Card Order by ID (used for live status polling on frontend & mobile)
+router.get(
+  "/orders/:id",
+  GiftCardController.getGiftCardOrderById
+);
+
+// Authenticated user: get my purchased gift card orders
+router.get(
+  "/my-orders",
+  auth(UserRole.USER, UserRole.BARISTA, UserRole.ADMIN),
+  GiftCardController.getMyGiftCardOrders
+);
+
+// Admin: view all gift card orders and payment statuses
+router.get(
+  "/admin/orders",
+  auth(UserRole.ADMIN),
+  GiftCardController.getAllGiftCardOrders
 );
 
 // Authenticated user: get my gift cards and balance
