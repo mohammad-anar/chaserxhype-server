@@ -115,4 +115,28 @@ enum AutomationStatus {
     PROCESSING
     COMPLETED
     FAILED
-}
+}
+
+enum GiftCardStatus {
+    ACTIVE
+    INACTIVE
+    PENDING_CLAIM
+    DEPLETED
+}
+
+enum GiftCardTxType {
+    PURCHASE
+    ORDER_PAYMENT
+    RELOAD
+    ADMIN_ADJUSTMENT
+    REDEMPTION
+}
+
+enum PointTxType {
+    EARNED_PURCHASE
+    EARNED_BONUS
+    REDEEMED_REWARD
+    ADMIN_ADJUSTMENT
+    MANUAL_SCAN
+}
+

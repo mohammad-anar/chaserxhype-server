@@ -50,13 +50,19 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
 
     const totalAmount = Number(cart.total || 0);
 
-    const initialStatus = (isCoinProduct && totalAmount <= 0) ? "CONFIRMED" : "PENDING";
-    const initialPaymentStatus = (isCoinProduct && totalAmount <= 0) ? "PAID" : "PENDING";
+    // Check user gift card balance if requested
+    const userRecord = await tx.user.findUnique({ where: { id: userId } });
+    const userGiftCardBal = Number(userRecord?.giftCardBalance || 0);
+    const requestedGiftCardAmt = Number(payload.giftCardAmount || 0);
+    const appliedGiftCard = requestedGiftCardAmt > 0 ? Math.min(requestedGiftCardAmt, userGiftCardBal, totalAmount) : 0;
+    const netPayable = Math.max(0, totalAmount - appliedGiftCard);
+
+    const initialStatus = (isCoinProduct && totalAmount <= 0) || (netPayable <= 0 && totalAmount > 0) ? "CONFIRMED" : "PENDING";
+    const initialPaymentStatus = (isCoinProduct && totalAmount <= 0) || (netPayable <= 0 && totalAmount > 0) ? "PAID" : "PENDING";
 
     let shippingAddressPayload = payload.shippingAddress;
     if (!shippingAddressPayload) {
       const userSavedAddress = await tx.address.findFirst({ where: { userId } });
-      const userRecord = await tx.user.findUnique({ where: { id: userId } });
       if (userSavedAddress) {
         shippingAddressPayload = {
           fullName: userRecord?.name || undefined,
@@ -104,6 +110,7 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
         taxAmount: isCoinProduct ? 0 : cart.taxAmount,
         deliveryFee: cart.deliveryFee,
         serviceCharge: cart.serviceCharge,
+        giftCardAmount: appliedGiftCard,
         paymentMethod: isCoinProduct ? "REWARD_COINS" : "MONEY",
         payType: isCoinProduct ? null : (payload.payType || "CARD"),
         earnedCoin: isCoinProduct ? 0 : totalEarnedCoin,
@@ -112,6 +119,29 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
         note: finalNote,
       },
     });
+
+    // Deduct user's gift card balance and create transaction if applied
+    if (appliedGiftCard > 0) {
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          giftCardBalance: {
+            decrement: appliedGiftCard,
+          },
+        },
+      });
+
+      await tx.giftCardTransaction.create({
+        data: {
+          userId,
+          orderId: order.id,
+          amount: appliedGiftCard,
+          type: "ORDER_PAYMENT",
+          title: "Mobile Order Payment",
+          location: "Online Checkout",
+        },
+      });
+    }
 
     if (assignedBaristaId) {
       await tx.user.update({
@@ -231,6 +261,7 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
       isCoinProduct,
       totalAmount,
       totalEarnedCoin,
+      appliedGiftCard,
       cartSnapshot: {
         cartItems: cart.cartItems,
         deliveryFee: cart.deliveryFee,
@@ -243,7 +274,7 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
     timeout: 60000,
   });
 
-  const { orderId, orderNumber, isCoinProduct, totalAmount, totalEarnedCoin, cartSnapshot } = txResult;
+  const { orderId, orderNumber, isCoinProduct, totalAmount, totalEarnedCoin, appliedGiftCard, cartSnapshot } = txResult;
   let paymentUrl: string | null = null;
   const transactionId = `TXN-PENDING-${Date.now()}-${Math.floor(100000 + Math.random() * 900000)}`;
   const frontendUrl = config.frontend_url || "http://localhost:3000";
@@ -396,32 +427,49 @@ const checkout = async (userId: string, payload: ICheckoutPayload) => {
       });
     }
 
-    const session = await stripe.checkout.sessions.create({
-      line_items: lineItems,
-      mode: "payment",
-      success_url: `${frontendUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}&order_number=${orderNumber}&transaction_id=${transactionId}`,
-      cancel_url: `${frontendUrl}/payment/cancel?order_number=${orderNumber}&transaction_id=${transactionId}`,
-      metadata: {
-        orderId,
-        userId,
-        totalEarnedCoin: String(totalEarnedCoin),
-      },
-    });
+    const netPayable = Math.max(0, totalAmount - (txResult.appliedGiftCard || 0));
 
-    paymentUrl = session.url;
+    if (netPayable <= 0) {
+      // Fully paid via gift card
+      await prisma.payment.create({
+        data: {
+          orderId,
+          userId,
+          paymentMethod: payload.payType || "CARD",
+          status: "PAID",
+          amount: totalAmount,
+          currency: "USD",
+          transactionId,
+        },
+      });
+    } else {
+      const session = await stripe.checkout.sessions.create({
+        line_items: lineItems,
+        mode: "payment",
+        success_url: `${frontendUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}&order_number=${orderNumber}&transaction_id=${transactionId}`,
+        cancel_url: `${frontendUrl}/payment/cancel?order_number=${orderNumber}&transaction_id=${transactionId}`,
+        metadata: {
+          orderId,
+          userId,
+          totalEarnedCoin: String(totalEarnedCoin),
+        },
+      });
 
-    await prisma.payment.create({
-      data: {
-        orderId,
-        userId,
-        paymentMethod: payload.payType || "CARD",
-        status: "PENDING",
-        amount: totalAmount,
-        currency: "USD",
-        transactionId,
-        gatewayPaymentId: session.id,
-      },
-    });
+      paymentUrl = session.url;
+
+      await prisma.payment.create({
+        data: {
+          orderId,
+          userId,
+          paymentMethod: payload.payType || "CARD",
+          status: "PENDING",
+          amount: netPayable,
+          currency: "USD",
+          transactionId,
+          gatewayPaymentId: session.id,
+        },
+      });
+    }
   }
 
   // 3. Return full order object with associations
@@ -892,8 +940,45 @@ const updateOrderStatus = async (orderId: string, status: OrderStatus) => {
         },
       });
 
-      // If order transitioned to COMPLETED -> Deduct stock and release barista workload
+      // If order transitioned to COMPLETED -> Deduct stock, release barista workload, and award earned loyalty coins
       if (status === "COMPLETED") {
+        if (orderExists.userId && (orderExists.earnedCoin || 0) > 0) {
+          const existingPointTx = await tx.pointTransaction.findFirst({
+            where: { orderId: orderExists.id, type: "EARNED_PURCHASE" },
+          });
+
+          if (!existingPointTx) {
+            let wallet = await tx.wallet.findFirst({ where: { userId: orderExists.userId } });
+            if (!wallet) {
+              await tx.wallet.create({
+                data: {
+                  userId: orderExists.userId,
+                  balance: orderExists.earnedCoin || 0,
+                },
+              });
+            } else {
+              await tx.wallet.update({
+                where: { id: wallet.id },
+                data: {
+                  balance: {
+                    increment: orderExists.earnedCoin || 0,
+                  },
+                },
+              });
+            }
+
+            await tx.pointTransaction.create({
+              data: {
+                userId: orderExists.userId,
+                orderId: orderExists.id,
+                points: orderExists.earnedCoin || 0,
+                type: "EARNED_PURCHASE",
+                reason: `Earned points from Order #${orderExists.orderNumber}`,
+              },
+            });
+          }
+        }
+
         try {
           await InventoryServices.deductStock(orderId, tx);
         } catch (stockErr: any) {

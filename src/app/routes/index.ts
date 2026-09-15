@@ -24,6 +24,8 @@ import { BaristaRouter } from "../modules/barista/barista.routes.js";
 import { InvoiceRouter } from "../modules/invoice/invoice.routes.js";
 import { AutomationRouter } from "../modules/automation/automation.routes.js";
 import { AIRouter } from "../modules/ai/ai.routes.js";
+import { LoyaltyRouter } from "../modules/loyalty/loyalty.routes.js";
+import { GiftCardRouter } from "../modules/giftCard/giftCard.routes.js";
 
 const router = express.Router();
 
@@ -43,6 +45,14 @@ const moduleRoutes = [
   {
     path: "/wallet",
     route: WalletRouter,
+  },
+  {
+    path: "/loyalty",
+    route: LoyaltyRouter,
+  },
+  {
+    path: "/gift-cards",
+    route: GiftCardRouter,
   },
   {
     path: "/saved-card",

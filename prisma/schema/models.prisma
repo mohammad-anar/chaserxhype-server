@@ -16,6 +16,8 @@ model User {
     skillLevel         Int             @default(5)
     activeOrderCount   Int             @default(0)
     station            String?
+    loyaltyCode        String?         @unique
+    giftCardBalance    Decimal         @default(0)
     createdAt          DateTime        @default(now())
     updatedAt          DateTime        @updatedAt
     addresses          Address[]
@@ -30,6 +32,10 @@ model User {
     notifications      Notification[]
     tipsGiven          Tip[]           @relation("CustomerTips")
     tipsReceived       Tip[]           @relation("BaristaTips")
+    giftCards          GiftCard[]      @relation("RecipientGiftCards")
+    purchasedGiftCards GiftCard[]      @relation("PurchasedGiftCards")
+    pointTransactions  PointTransaction[]
+    giftCardTransactions GiftCardTransaction[]
 
     @@map("users")
 }
@@ -294,6 +300,7 @@ model Order {
 
     tipAmount         Decimal?             @default(0)
     tip               Tip?
+    giftCardAmount    Decimal?             @default(0)
 
     createdAt  DateTime    @default(now())
     updatedAt  DateTime    @updatedAt
@@ -310,6 +317,8 @@ model Order {
     invoice           Invoice?
     automationLogs    OrderAutomationLog[]
     stockMovements    StockMovement[]
+    giftCardTransactions GiftCardTransaction[]
+    pointTransactions    PointTransaction[]
 }
 
 model Tip {
@@ -600,5 +609,69 @@ model OrderAutomationLog {
 
     @@map("order_automation_logs")
 }
+
+model GiftCard {
+    id             String         @id @default(cuid())
+    code           String         @unique
+    nickname       String         @default("Morning Ritual Card")
+    designIndex    Int            @default(0)
+    initialAmount  Decimal
+    currentBalance Decimal
+    status         GiftCardStatus @default(ACTIVE)
+    isActive       Boolean        @default(true)
+
+    recipientName  String
+    recipientEmail String
+    personalMessage String?
+
+    purchaserId    String?
+    purchaser      User?          @relation("PurchasedGiftCards", fields: [purchaserId], references: [id])
+
+    userId         String?
+    user           User?          @relation("RecipientGiftCards", fields: [userId], references: [id])
+
+    isClaimed      Boolean        @default(false)
+    claimedAt      DateTime?
+
+    createdAt      DateTime       @default(now())
+    updatedAt      DateTime       @updatedAt
+
+    transactions   GiftCardTransaction[]
+
+    @@map("gift_cards")
+}
+
+model GiftCardTransaction {
+    id          String         @id @default(cuid())
+    giftCardId  String?
+    giftCard    GiftCard?      @relation(fields: [giftCardId], references: [id], onDelete: Cascade)
+    userId      String
+    user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+    orderId     String?
+    order       Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
+    amount      Decimal
+    type        GiftCardTxType
+    title       String
+    location    String?
+    createdAt   DateTime       @default(now())
+
+    @@map("gift_card_transactions")
+}
+
+model PointTransaction {
+    id          String      @id @default(cuid())
+    userId      String
+    user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+    orderId     String?
+    order       Order?      @relation(fields: [orderId], references: [id], onDelete: SetNull)
+    staffId     String?
+    points      Int
+    type        PointTxType
+    reason      String?
+    createdAt   DateTime    @default(now())
+
+    @@map("point_transactions")
+}
+
 
 

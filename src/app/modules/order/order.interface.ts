@@ -13,5 +13,7 @@ export interface IShippingAddress {
 export interface ICheckoutPayload {
   payType?: PayType;
   note?: string;
+  giftCardAmount?: number;
   shippingAddress?: IShippingAddress;
 }
+

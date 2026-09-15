@@ -47,8 +47,25 @@ const createUser = async (payload: ICreateUserPayload) => {
   const otpCode = generateOTP().toString();
   const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
+  // Generate unique loyalty code
+  const segment = () => Math.random().toString(36).substring(2, 6).toUpperCase();
+  const loyaltyCode = `CH-${segment()}-${segment()}`;
+
   // Create User and Wallet within a transaction
   const result = await prisma.$transaction(async (tx) => {
+    // Check for pending gift cards sent to this email
+    const pendingGiftCards = await tx.giftCard.findMany({
+      where: {
+        recipientEmail: { equals: normalizedEmail, mode: "insensitive" },
+        isClaimed: false,
+      },
+    });
+
+    const totalGiftCardBalance = pendingGiftCards.reduce(
+      (sum, card) => sum + Number(card.currentBalance || 0),
+      0
+    );
+
     const user = await tx.user.create({
       data: {
         name: payload.name,
@@ -57,6 +74,8 @@ const createUser = async (payload: ICreateUserPayload) => {
         password: hashedPassword,
         otpCode,
         otpExpiresAt,
+        loyaltyCode,
+        giftCardBalance: totalGiftCardBalance,
         role: UserRole.USER,
         status: UserStatus.ACTIVE,
         isVerified: false,
@@ -71,6 +90,20 @@ const createUser = async (payload: ICreateUserPayload) => {
         balance: 0,
       },
     });
+
+    // Mark pending gift cards as claimed by this new user
+    if (pendingGiftCards.length > 0) {
+      await tx.giftCard.updateMany({
+        where: {
+          id: { in: pendingGiftCards.map((c) => c.id) },
+        },
+        data: {
+          userId: user.id,
+          isClaimed: true,
+          claimedAt: new Date(),
+        },
+      });
+    }
 
     return user;
   });
@@ -97,6 +130,7 @@ const getMyProfile = async (userId: string) => {
     include: {
       wallets: true,
       addresses: true,
+      giftCards: true,
     },
   });
 
@@ -104,12 +138,25 @@ const getMyProfile = async (userId: string) => {
     throw new ApiError(StatusCodes.NOT_FOUND, "User profile not found");
   }
 
+  let loyaltyCode = user.loyaltyCode;
+  if (!loyaltyCode) {
+    const segment = () => Math.random().toString(36).substring(2, 6).toUpperCase();
+    loyaltyCode = `CH-${segment()}-${segment()}`;
+    await prisma.user.update({
+      where: { id: userId },
+      data: { loyaltyCode },
+    });
+  }
+
   const { password, ...userWithoutPassword } = user;
   const stars = user.wallets && user.wallets.length > 0 ? Number(user.wallets[0].balance || 0) : 0;
+  const giftCardBalance = Number(user.giftCardBalance || 0);
 
   return {
     ...userWithoutPassword,
+    loyaltyCode,
     stars,
+    giftCardBalance,
   };
 };
 
