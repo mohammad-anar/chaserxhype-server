@@ -38,14 +38,15 @@ const calculateScore = (barista: {
 
 /**
  * Finds the best available barista using deterministic scoring.
+ * Strictly searches for dedicated BARISTA role users (never ADMIN).
  */
 const findBestAvailableBarista = async (
   txClient?: Prisma.TransactionClient
 ): Promise<IBaristaScoreResult | null> => {
   const client = txClient || prisma;
 
-  // 1. First look for dedicated BARISTA role users
-  let baristas = await client.user.findMany({
+  // Look strictly for dedicated BARISTA role users
+  const baristas = await client.user.findMany({
     where: {
       role: UserRole.BARISTA,
       status: "ACTIVE",
@@ -59,24 +60,6 @@ const findBestAvailableBarista = async (
       skillLevel: true,
     },
   });
-
-  // 2. If no BARISTA role users found, fallback to ADMIN users so the system never halts
-  if (baristas.length === 0) {
-    baristas = await client.user.findMany({
-      where: {
-        role: UserRole.ADMIN,
-        status: "ACTIVE",
-        isDeleted: false,
-      },
-      select: {
-        id: true,
-        name: true,
-        isAvailable: true,
-        activeOrderCount: true,
-        skillLevel: true,
-      },
-    });
-  }
 
   if (baristas.length === 0) {
     return null;
@@ -180,6 +163,9 @@ const assignBaristaToOrder = async (
       const barista = await tx.user.findUnique({ where: { id: targetBaristaId } });
       if (!barista) {
         throw new ApiError(StatusCodes.NOT_FOUND, "Selected barista does not exist");
+      }
+      if (barista.role !== UserRole.BARISTA) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, "Selected user does not have the BARISTA role");
       }
       targetBaristaName = barista.name;
 
@@ -306,11 +292,12 @@ const releaseBaristaWorkload = async (
 
 /**
  * Lists all baristas with their current workload and availability.
+ * Strictly returns users with UserRole.BARISTA (excludes ADMIN).
  */
 const getAllBaristas = async () => {
   const baristas = await prisma.user.findMany({
     where: {
-      OR: [{ role: UserRole.BARISTA }, { role: UserRole.ADMIN }],
+      role: UserRole.BARISTA,
       isDeleted: false,
     },
     select: {
