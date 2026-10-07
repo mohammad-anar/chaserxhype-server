@@ -1,4 +1,28 @@
 services:
+  # ------------------------------------------------------------
+  # PostgreSQL Database Container
+  # ------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: chaserxhype-server-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+      POSTGRES_DB: ${POSTGRES_DB:-chaserxhype}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-chaserxhype}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ------------------------------------------------------------
+  # Redis Container (Queue & Cache for BullMQ)
+  # ------------------------------------------------------------
   redis:
     image: redis:7-alpine
     container_name: chaserxhype-server-redis
@@ -14,6 +38,9 @@ services:
       timeout: 3s
       retries: 5
 
+  # ------------------------------------------------------------
+  # API Backend Server
+  # ------------------------------------------------------------
   server:
     build:
       context: .
@@ -32,10 +59,17 @@ services:
     volumes:
       - server_uploads:/app/uploads
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
 
+# ------------------------------------------------------------
+# Persistent Volumes
+# ------------------------------------------------------------
 volumes:
+  postgres_data:
+    driver: local
   redis_data:
     driver: local
   server_uploads:
